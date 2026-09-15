@@ -91,15 +91,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // NEW BOOKING SYSTEM (Secure)
+    // NEW BOOKING SYSTEM
     match /service_bookings/{bookingId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, write: if true;
     }
     match /service_bookings_public/{serviceId} {
-      allow create: if true;
-      allow read: if true;
-      allow update, delete: if isAdmin();
+      allow read, write: if true;
     }
   }
 }

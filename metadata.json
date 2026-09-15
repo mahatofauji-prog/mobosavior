@@ -1,0 +1,6 @@
+{
+  "name": "MOBO SAVIOR",
+  "description": "Professional iPhone & Android mobile repair services in Purulia, West Bengal. Specialized in display and battery replacements, dead phone repair, and CPU/IC level repair.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

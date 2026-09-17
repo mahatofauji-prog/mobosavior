@@ -88,7 +88,7 @@ export default function SEOHead({
     setMetaTag('meta[name="description"]', 'name', 'description', finalDesc);
 
     // 3. Robots Meta Config
-    const isPrivate = noindex || currentRoute === 'admin' || currentRoute === 'my-booking';
+    const isPrivate = noindex || currentRoute === 'moboadmin2026' || currentRoute === 'my-booking';
     const robotsValue = isPrivate ? 'noindex, nofollow' : (seoSettings?.robotsConfig || 'index, follow');
     setMetaTag('meta[name="robots"]', 'name', 'robots', robotsValue);
 

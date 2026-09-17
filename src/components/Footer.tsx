@@ -183,11 +183,6 @@ export default function Footer({
                   Track My Repair
                 </button>
               </li>
-              <li>
-                <button onClick={() => onNavigate('admin')} className="hover:text-[#38BDF8] transition-colors focus:outline-none opacity-50">
-                  Staff Login Portal
-                </button>
-              </li>
             </ul>
           </div>
 

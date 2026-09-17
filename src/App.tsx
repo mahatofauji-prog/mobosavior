@@ -427,13 +427,14 @@ export default function App() {
         return <PrivacyPolicy />;
       case 'terms-conditions':
         return <TermsConditions />;
-      case 'admin':
+      case 'moboadmin2026':
         if (adminUser) {
           return (
             <AdminDashboard 
               onLogout={() => {
                 setAdminUser(false);
                 localStorage.removeItem('mobo_admin_session');
+                window.location.hash = '#/moboadmin2026';
               }} 
               servicesList={services}
               reviewsList={reviews}

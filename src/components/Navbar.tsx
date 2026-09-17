@@ -92,9 +92,9 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
         }`}
         id="navbar-header"
       >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-1 xs:gap-2">
         {/* Brand Logo */}
-        <button onClick={() => handleLinkClick('home')} className="focus:outline-none">
+        <button onClick={() => handleLinkClick('home')} className="focus:outline-none flex-shrink max-w-[50%] xs:max-w-[55%] min-w-0">
           <Logo logoUrl={branding.logoUrl} brandName={branding.brandName} />
         </button>
 
@@ -259,30 +259,30 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
         </div>
 
         {/* Mobile Navbar Buttons */}
-        <div className="flex lg:hidden items-center gap-1.5">
+        <div className="flex lg:hidden items-center gap-1 xs:gap-1.5 flex-shrink-0">
 
           <button
             onClick={() => handleLinkClick('track-service')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-lg transition-all focus:outline-none border border-slate-200"
+            className="flex items-center gap-1 px-2 xs:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] xs:text-xs font-extrabold rounded-lg transition-all focus:outline-none border border-slate-200 whitespace-nowrap"
           >
             <span>Track</span>
           </button>
           {/* Direct Mobile Booking Icon CTA */}
           <button
             onClick={() => handleLinkClick('book-repair')}
-            className="flex items-center gap-1 px-3 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-extrabold rounded-lg shadow-sm transition-all focus:outline-none"
+            className="flex items-center gap-1 px-2 xs:px-3 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white text-[10px] xs:text-xs font-extrabold rounded-lg shadow-sm transition-all focus:outline-none whitespace-nowrap"
           >
-            <Calendar className="w-3.5 h-3.5" />
+            <Calendar className="w-3 h-3 xs:w-3.5 xs:h-3.5" />
             <span>Book</span>
           </button>
 
           {/* Toggle Menu */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="p-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 focus:outline-none"
+            className="p-1.5 xs:p-2 rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 focus:outline-none"
             aria-label="Toggle navigation menu"
           >
-            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isOpen ? <X className="w-4 h-4 xs:w-5 xs:h-5" /> : <Menu className="w-4 h-4 xs:w-5 xs:h-5" />}
           </button>
         </div>
       </div>

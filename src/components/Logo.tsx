@@ -47,7 +47,7 @@ export default function Logo({
   };
 
   return (
-    <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 select-none group text-left">
+    <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 select-none group text-left min-w-0">
       {/* Round Shape Logo Frame (Left Logo Icon) */}
       <div 
         className={`relative flex-shrink-0 ${className} rounded-full overflow-hidden border transition-all duration-300 shadow-sm flex items-center justify-center bg-white ${
@@ -73,27 +73,27 @@ export default function Logo({
 
       {/* Brand Text Block with "MOBO SAVIOR" and Crisp Tagline */}
       {showText && (
-        <div className="flex flex-col text-left leading-none justify-center">
-          <div className="flex items-center gap-1 sm:gap-1.5">
+        <div className="flex flex-col text-left leading-none justify-center min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap xs:flex-nowrap">
             <span 
               style={moboStyle}
-              className="font-black text-sm xs:text-base sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
+              className="font-black text-xs xs:text-sm sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
             >
               MOBO
             </span>
             <span 
               style={saviorStyle}
-              className="font-black text-sm xs:text-base sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
+              className="font-black text-xs xs:text-sm sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
             >
               SAVIOR
             </span>
           </div>
           
           {/* Tagline directly underneath without any thick dark/metallic box - clean, golden and highly readable */}
-          <div className="mt-0.5 xs:mt-1 flex items-center">
+          <div className="mt-0.5 xs:mt-1 flex items-center overflow-hidden">
             <span 
               style={taglineStyle}
-              className="text-[6.5px] xs:text-[7.5px] sm:text-[9px] font-black tracking-wider uppercase leading-none whitespace-nowrap"
+              className="text-[5.5px] xs:text-[6.5px] sm:text-[9px] font-black tracking-wider uppercase leading-tight truncate w-full block"
             >
               PURULIA KA TRUSTED MOBILE REPAIRING SHOP
             </span>

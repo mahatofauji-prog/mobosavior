@@ -129,10 +129,26 @@ export default function App() {
   });
   const isFetchingRef = useRef(false);
 
-  // Parse routing from location Hash
+  // Parse routing from location Hash or Pathname
   const handleHashChange = () => {
-    const hash = window.location.hash || '#/';
-    const rawPath = hash.replace(/^#\//, '');
+    let rawPath = '';
+    
+    // Check if the user navigated to a pathname directly (e.g., /moboadmin2026)
+    const pathname = window.location.pathname;
+    if (pathname && pathname !== '/' && pathname !== '/index.html') {
+      // Normalize pathname by removing leading slash
+      rawPath = pathname.substring(1);
+      
+      // Update hash to match the pathname to ensure app functions as expected with hash routing
+      // Use replaceState to avoid adding duplicate history entries
+      if (!window.location.hash) {
+         window.history.replaceState(null, '', `#/${rawPath}`);
+      }
+    } else {
+      const hash = window.location.hash || '#/';
+      rawPath = hash.replace(/^#\//, '');
+    }
+
     const pathWithQuery = rawPath.split('?')[0];
     const queryString = rawPath.includes('?') ? rawPath.substring(rawPath.indexOf('?') + 1) : '';
 

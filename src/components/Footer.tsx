@@ -245,8 +245,19 @@ export default function Footer({
             <button onClick={() => onNavigate('privacy-policy')} className="hover:text-slate-300">Privacy Policy</button>
             <button onClick={() => onNavigate('terms-conditions')} className="hover:text-slate-300">Terms & Conditions</button>
           </p>
-          <div className="flex gap-6 text-[10px] text-slate-500">
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6 text-[10px] text-slate-500">
             <span>Saddam Technical Specialist Partner</span>
+            <span>
+              Designed By{' '}
+              <a 
+                href="https://www.manisolution.com/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                MANI Solution
+              </a>
+            </span>
           </div>
         </div>
       </div>

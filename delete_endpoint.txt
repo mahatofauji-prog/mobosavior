@@ -1,0 +1,28 @@
+// Delete Media Endpoint
+app.post('/api/delete', (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string' || !url.startsWith('/uploads/')) {
+      return res.status(400).json({ success: false, error: 'Invalid URL' });
+    }
+    
+    // Security: prevent directory traversal
+    const normalizedUrl = path.normalize(url).replace(/^\\/, '/');
+    if (normalizedUrl.includes('..')) {
+      return res.status(400).json({ success: false, error: 'Invalid URL path' });
+    }
+
+    const relativePath = normalizedUrl.replace(/^\/uploads\//, '');
+    const filePath = path.join(UPLOADS_BASE, relativePath);
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      return res.status(200).json({ success: true });
+    } else {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+  } catch (error: any) {
+    console.error('Delete error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});

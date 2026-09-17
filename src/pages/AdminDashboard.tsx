@@ -1,0 +1,2750 @@
+import React, { useState, useEffect } from 'react';
+import { signOut } from 'firebase/auth';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { auth, db } from '../firebase/config';
+import { uploadMediaFile, deleteMediaFile } from '../lib/storageUpload';
+import { 
+  Booking, Service, FAQItem, Review, GalleryItem, VideoItem, 
+  BrandingSettings, ContactSettings, WebsiteContent, SEOSettings, BookingStatus, SlideItem, BusinessHours 
+} from '../types';
+import { 
+  LayoutDashboard, Calendar, Wrench, Image, Play, Star, HelpCircle, 
+  FileText, ShieldAlert, Shield, LogOut, Plus, Edit, Trash2, Check, Search, Filter, 
+  AlertCircle, Save, Loader2, Sparkles, SlidersHorizontal, Globe, CheckSquare, X, Eye, Phone, MessageSquare,
+  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { getServiceImage } from '../utils/serviceImages';
+import AdminOffers from '../components/admin/AdminOffers';
+import AdminServiceBookings from '../components/admin/AdminServiceBookings';
+import AdminTrustSection from '../components/admin/AdminTrustSection';
+import AdminBrandsModels from '../components/admin/AdminBrandsModels';
+import AdminCategories from '../components/admin/AdminCategories';
+import AdminGalleryManager from '../components/admin/AdminGalleryManager';
+import AdminReviewsManager from '../components/admin/AdminReviewsManager';
+import AdminSEOSettings from '../components/admin/AdminSEOSettings';
+import AdminPrices from '../components/admin/AdminPrices';
+import AdminPages from '../components/admin/AdminPages';
+import AdminBlog from '../components/admin/AdminBlog';
+import AdminNavigation from '../components/admin/AdminNavigation';
+import AdminLegalPages from '../components/admin/AdminLegalPages';
+import AdminMediaLibrary from '../components/admin/AdminMediaLibrary';
+import AdminBranches from '../components/admin/AdminBranches';
+import AdminSections from '../components/admin/AdminSections';
+import AdminAnalyticsDashboard from '../components/admin/AdminAnalyticsDashboard';
+import ImageUploader from '../components/admin/ImageUploader';
+import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
+import { parseVideoUrl, getVideoPlatformLabel } from '../lib/videoUtils';
+
+
+interface AdminDashboardProps {
+  onLogout: () => void;
+  servicesList: Service[];
+  reviewsList: Review[];
+  faqsList: FAQItem[];
+  brandingSettings: BrandingSettings;
+  contactSettings: ContactSettings;
+  websiteContent: WebsiteContent;
+  seoSettings: SEOSettings;
+  onRefreshData: () => void;
+  slideshowList: SlideItem[];
+  businessHours?: BusinessHours;
+}
+
+export default function AdminDashboard({
+  onLogout,
+  servicesList,
+  reviewsList,
+  faqsList,
+  brandingSettings,
+  contactSettings,
+  websiteContent,
+  seoSettings,
+  onRefreshData,
+  slideshowList,
+  businessHours
+}: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<
+    | 'dashboard' | 'bookings' | 'branches' | 'services' | 'categories' | 'brands' | 'models'
+    | 'prices' | 'gallery' | 'videos' | 'reviews' | 'offers' | 'trust' | 'faq'
+    | 'contact' | 'hours' | 'social' | 'maps' | 'content' | 'seo' | 'sections'
+    | 'analytics' | 'slideshow' | 'media' | 'pages' | 'blog' | 'navigation' | 'media-library' | 'legal'
+  >('dashboard');
+
+  // Business Hours state - synced from live database
+  const [monFriHours, setMonFriHours] = useState(businessHours?.monFri || '10:00 AM - 08:30 PM');
+  const [satHours, setSatHours] = useState(businessHours?.saturday || '10:00 AM - 08:30 PM');
+  const [sunHours, setSunHours] = useState(businessHours?.sunday || 'Closed / Emergency Only');
+  const [weeklyHoliday, setWeeklyHoliday] = useState((businessHours as any)?.weeklyHoliday || 'Sunday');
+  const [hoursNote, setHoursNote] = useState(businessHours?.hoursNote || (businessHours as any)?.note || 'Open all days except public festival holidays. Express bench service available.');
+
+  useEffect(() => {
+    if (businessHours) {
+      if (businessHours.monFri) setMonFriHours(businessHours.monFri);
+      if (businessHours.saturday) setSatHours(businessHours.saturday);
+      if (businessHours.sunday) setSunHours(businessHours.sunday);
+      if ((businessHours as any).weeklyHoliday) setWeeklyHoliday((businessHours as any).weeklyHoliday);
+      if (businessHours.hoursNote) setHoursNote(businessHours.hoursNote);
+      else if ((businessHours as any).note) setHoursNote((businessHours as any).note);
+    }
+  }, [businessHours]);
+
+  // Analytics ID state
+  const [gaMeasurementId, setGaMeasurementId] = useState(seoSettings.googleAnalyticsId || 'G-XXXXXXXXXX');
+
+  // Media State
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [mediaTab, setMediaTab] = useState<'photos' | 'videos'>('photos');
+
+  // Media CRUD Modals
+  const [galleryModal, setGalleryModal] = useState<{ open: boolean; item?: GalleryItem | null }>({ open: false });
+  const [videoModal, setVideoModal] = useState<{ open: boolean; item?: VideoItem | null }>({ open: false });
+  const [previewMedia, setPreviewMedia] = useState<{ open: boolean; type: 'photo' | 'video'; url: string; title: string; description: string } | null>(null);
+
+  // Upload loading
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Load bookings
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  // Search/Filter state for Bookings
+  const [searchBooking, setSearchBooking] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [bookingNotes, setBookingNotes] = useState('');
+
+  // Local state editors
+  const [services, setServices] = useState<Service[]>(servicesList);
+  const [reviews, setReviews] = useState<Review[]>(reviewsList);
+  const [faqs, setFaqs] = useState<FAQItem[]>(faqsList);
+  
+  // Settings Forms states
+  const [brandName, setBrandName] = useState(brandingSettings.brandName || '');
+  const [logoUrl, setLogoUrl] = useState(brandingSettings.logoUrl || '');
+  const [tagline, setTagline] = useState(brandingSettings.tagline || '');
+
+  const [address, setAddress] = useState(contactSettings.address || '');
+  const [phone, setPhone] = useState(contactSettings.phone || '');
+  const [whatsapp, setWhatsapp] = useState(contactSettings.whatsapp || '');
+  const [facebook, setFacebook] = useState(contactSettings.facebook || 'https://www.facebook.com/share/19aL5sjb28/');
+  const [instagram, setInstagram] = useState(contactSettings.instagram || 'https://www.instagram.com/saddam617technical?stkn=MWh2MXNnZjZwNXI5MQ==');
+  const [youtube, setYoutube] = useState(contactSettings.youtube || '');
+  const [whatsappChannelUrl, setWhatsappChannelUrl] = useState(contactSettings.whatsappChannelUrl || 'https://whatsapp.com/channel/0029VaRdZK80QeahHriOTD1K');
+  const [mapsUrl, setMapsUrl] = useState(contactSettings.googleMapsUrl || 'https://maps.app.goo.gl/tU41BvTCk3dRAn6r9');
+  const [mapIframeUrl, setMapIframeUrl] = useState(contactSettings.mapIframeUrl || '');
+
+  const [heroTitle, setHeroTitle] = useState(websiteContent.heroTitle || '');
+  const [heroDesc, setHeroDesc] = useState(websiteContent.heroDescription || '');
+  const [aboutText, setAboutText] = useState(websiteContent.aboutText || '');
+  const [aboutHighlight, setAboutHighlight] = useState(websiteContent.aboutHighlight || '');
+
+  const [seoTitle, setSeoTitle] = useState(seoSettings.siteTitle || '');
+  const [seoDesc, setSeoDesc] = useState(seoSettings.metaDescription || '');
+  const [seoVerification, setSeoVerification] = useState(seoSettings.searchConsoleVerification || '');
+  const [seoRobots, setSeoRobots] = useState(seoSettings.robotsConfig || 'index, follow');
+
+  // CRUD Modal States
+  const [serviceModal, setServiceModal] = useState<{ open: boolean; item?: Service }>({ open: false });
+  const [faqModal, setFaqModal] = useState<{ open: boolean; item?: FAQItem }>({ open: false });
+  const [reviewModal, setReviewModal] = useState<{ open: boolean; item?: Review }>({ open: false });
+  const [slideModal, setSlideModal] = useState<{ open: boolean; item?: SlideItem | null }>({ open: false });
+  
+  const [serviceFormImageUrl, setServiceFormImageUrl] = useState('');
+  const [slideFormImageUrl, setSlideFormImageUrl] = useState('');
+
+  useEffect(() => {
+    if (serviceModal.open) {
+      setServiceFormImageUrl(serviceModal.item?.imageUrl || '');
+    }
+  }, [serviceModal.open, serviceModal.item]);
+
+  useEffect(() => {
+    if (slideModal.open) {
+      setSlideFormImageUrl(slideModal.item?.imageUrl || '');
+    }
+  }, [slideModal.open, slideModal.item]);
+
+  // Load Bookings directly
+  const fetchBookings = async () => {
+    setLoadingBookings(true);
+    try {
+      const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const fetched: Booking[] = [];
+      snapshot.forEach((doc) => {
+        fetched.push({ ...doc.data() } as Booking);
+      });
+      setBookings(fetched);
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+
+  const fetchMedia = async () => {
+    setLoadingMedia(true);
+    try {
+      const gQ = query(collection(db, 'gallery'), orderBy('displayOrder', 'asc'));
+      const gSnapshot = await getDocs(gQ);
+      const fetchedGallery: GalleryItem[] = [];
+      gSnapshot.forEach((doc) => {
+        fetchedGallery.push({ id: doc.id, ...doc.data() } as GalleryItem);
+      });
+      setGallery(fetchedGallery);
+
+      const vQ = query(collection(db, 'videos'), orderBy('displayOrder', 'asc'));
+      const vSnapshot = await getDocs(vQ);
+      const fetchedVideos: VideoItem[] = [];
+      vSnapshot.forEach((doc) => {
+        fetchedVideos.push({ id: doc.id, ...doc.data() } as VideoItem);
+      });
+      setVideos(fetchedVideos);
+    } catch (err) {
+      console.error('Error fetching media:', err);
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBookings();
+    if (activeTab === 'media') {
+      fetchMedia();
+    }
+  }, [activeTab]);
+
+  const handleSaveGalleryItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setUploadLoading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const title = formData.get('title') as string;
+      const description = formData.get('description') as string;
+      const category = formData.get('category') as string;
+      const displayOrder = parseInt(formData.get('displayOrder') as string) || 1;
+      const active = formData.get('active') === 'true';
+      const featured = formData.get('featured') === 'true';
+      const altText = formData.get('altText') as string || title;
+      const fileInput = e.currentTarget.querySelector('input[name="imageFile"]') as HTMLInputElement;
+      let imageUrl = formData.get('imageUrl') as string || '';
+
+      if (fileInput && fileInput.files && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const res = await uploadMediaFile(file, { folder: 'gallery' });
+        if (!res.success || !res.url) {
+          alert(res.error || 'Failed to upload image file');
+          setUploadLoading(false);
+          return;
+        }
+        imageUrl = res.url;
+      }
+
+      if (!imageUrl) {
+        alert('Please select an image file to upload or enter a custom image URL.');
+        setUploadLoading(false);
+        return;
+      }
+
+      const itemId = galleryModal.item?.id || `gal_${Date.now()}`;
+      const itemData = {
+        imageUrl,
+        title,
+        description,
+        category,
+        altText,
+        featured,
+        displayOrder,
+        active,
+        createdAt: galleryModal.item?.createdAt || new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'gallery', itemId), itemData);
+      setGalleryModal({ open: false });
+      fetchMedia();
+      alert('Photo saved successfully!');
+    } catch (err) {
+      console.error('Error saving gallery item:', err);
+      alert('Failed to save photo.');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleDeleteGalleryItem = async (id: string, imageUrl: string) => {
+    if (confirm('Are you sure you want to permanently delete this photo?')) {
+      try {
+        await deleteDoc(doc(db, 'gallery', id));
+        if (imageUrl) {
+          await deleteMediaFile(imageUrl);
+        }
+        fetchMedia();
+        alert('Photo deleted successfully.');
+      } catch (err) {
+        console.error('Error deleting gallery item:', err);
+        alert('Failed to delete photo.');
+      }
+    }
+  };
+
+  const handleSaveVideoItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setUploadLoading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const title = formData.get('title') as string;
+      const description = formData.get('description') as string;
+      const category = formData.get('category') as string;
+      const displayOrder = parseInt(formData.get('displayOrder') as string) || 1;
+      const active = formData.get('active') === 'true';
+      const featured = formData.get('featured') === 'true';
+      const rawVideoUrl = (formData.get('videoUrl') as string || '').trim();
+
+      const parsedVideo = parseVideoUrl(rawVideoUrl);
+      if (!parsedVideo || !parsedVideo.isValid) {
+        alert('Please enter a valid YouTube, Facebook or Instagram video URL.');
+        setUploadLoading(false);
+        return;
+      }
+
+      const itemId = videoModal.item?.id || `vid_${Date.now()}`;
+      const itemData = {
+        videoUrl: parsedVideo.originalUrl,
+        videoPlatform: parsedVideo.platform,
+        youtubeVideoId: parsedVideo.youtubeId || null,
+        thumbnailUrl: parsedVideo.defaultThumbnail || null,
+        title,
+        description,
+        category,
+        featured,
+        displayOrder,
+        active,
+        createdAt: videoModal.item?.createdAt || new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'videos', itemId), itemData);
+      setVideoModal({ open: false });
+      fetchMedia();
+      alert('Video saved successfully!');
+    } catch (err) {
+      console.error('Error saving video item:', err);
+      alert('Failed to save video.');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleDeleteVideoItem = async (id: string, videoUrl: string) => {
+    if (confirm('Are you sure you want to permanently delete this video?')) {
+      try {
+        await deleteDoc(doc(db, 'videos', id));
+        if (videoUrl && (videoUrl.includes('firebasestorage') || videoUrl.includes('appspot.com'))) {
+          await deleteMediaFile(videoUrl);
+        }
+        fetchMedia();
+        alert('Video deleted successfully.');
+      } catch (err) {
+        console.error('Error deleting video item:', err);
+        alert('Failed to delete video.');
+      }
+    }
+  };
+
+  const handleMoveGalleryItem = async (index: number, direction: 'up' | 'down') => {
+    const sorted = [...gallery].sort((a, b) => a.displayOrder - b.displayOrder);
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === sorted.length - 1) return;
+
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    const itemA = sorted[index];
+    const itemB = sorted[swapIndex];
+
+    const tempOrder = itemA.displayOrder;
+    itemA.displayOrder = itemB.displayOrder === tempOrder ? tempOrder + 1 : itemB.displayOrder;
+    itemB.displayOrder = tempOrder;
+
+    try {
+      await updateDoc(doc(db, 'gallery', itemA.id), { displayOrder: itemA.displayOrder });
+      await updateDoc(doc(db, 'gallery', itemB.id), { displayOrder: itemB.displayOrder });
+      fetchMedia();
+    } catch (err) {
+      console.error('Error updating order:', err);
+    }
+  };
+
+  const handleMoveVideoItem = async (index: number, direction: 'up' | 'down') => {
+    const sorted = [...videos].sort((a, b) => a.displayOrder - b.displayOrder);
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === sorted.length - 1) return;
+
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    const itemA = sorted[index];
+    const itemB = sorted[swapIndex];
+
+    const tempOrder = itemA.displayOrder;
+    itemA.displayOrder = itemB.displayOrder === tempOrder ? tempOrder + 1 : itemB.displayOrder;
+    itemB.displayOrder = tempOrder;
+
+    try {
+      await updateDoc(doc(db, 'videos', itemA.id), { displayOrder: itemA.displayOrder });
+      await updateDoc(doc(db, 'videos', itemB.id), { displayOrder: itemB.displayOrder });
+      fetchMedia();
+    } catch (err) {
+      console.error('Error updating order:', err);
+    }
+  };
+
+  const handleToggleGalleryActive = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'gallery', id), { active: !currentStatus });
+      fetchMedia();
+    } catch (err) {
+      console.error('Error toggling gallery active state:', err);
+    }
+  };
+
+  const handleToggleVideoActive = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'videos', id), { active: !currentStatus });
+      fetchMedia();
+    } catch (err) {
+      console.error('Error toggling video active state:', err);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    onLogout();
+  };
+
+  // Safe CRUD Actions
+  const handleSaveBranding = async () => {
+    setSaveLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'branding'), { brandName, logoUrl, tagline });
+      onRefreshData();
+      alert('Branding updated successfully!');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    setSaveLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'contact'), {
+        name: 'MOBO SAVIOR',
+        address,
+        phone,
+        whatsapp,
+        facebook,
+        instagram,
+        youtube,
+        whatsappChannelUrl,
+        googleMapsUrl: mapsUrl,
+        mapIframeUrl
+      });
+      onRefreshData();
+      alert('Contact, location and social media settings updated successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save contact settings. Please try again.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSaveContent = async () => {
+    setSaveLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'content'), {
+        heroTitle,
+        heroDescription: heroDesc,
+        ctaText: 'BOOK A REPAIR',
+        aboutText,
+        aboutHighlight,
+        whyChooseUs: websiteContent.whyChooseUs
+      });
+      onRefreshData();
+      alert('Website Content updated successfully!');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSaveSEO = async () => {
+    setSaveLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'seo'), {
+        siteTitle: seoTitle,
+        metaDescription: seoDesc,
+        searchConsoleVerification: seoVerification,
+        robotsConfig: seoRobots,
+        primaryKeyword: seoSettings.primaryKeyword,
+        secondaryKeywords: seoSettings.secondaryKeywords,
+        canonicalUrl: seoSettings.canonicalUrl,
+        googleAnalyticsId: gaMeasurementId
+      });
+      onRefreshData();
+      alert('SEO & Indexing Configurations updated!');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSaveHours = async () => {
+    setSaveLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'businessHours'), {
+        monFri: monFriHours,
+        saturday: satHours,
+        sunday: sunHours,
+        weeklyHoliday,
+        note: hoursNote,
+        hoursNote: hoursNote,
+        updatedAt: new Date().toISOString()
+      });
+      onRefreshData();
+      alert('Business hours and store schedule saved successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save business hours.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleSaveAnalytics = async () => {
+    setSaveLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'seo'), {
+        ...seoSettings,
+        siteTitle: seoTitle,
+        metaDescription: seoDesc,
+        googleAnalyticsId: gaMeasurementId
+      }, { merge: true });
+      onRefreshData();
+      alert('Google Analytics settings updated successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save analytics settings.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  // Booking details update Notes / Status
+  const handleUpdateBooking = async (id: string, updates: Partial<Booking>) => {
+    try {
+      await updateDoc(doc(db, 'bookings', id), updates);
+      fetchBookings();
+      if (selectedBooking && selectedBooking.id === id) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updates } : null);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update booking status.');
+    }
+  };
+
+  const handleDeleteBooking = async (id: string) => {
+    if (confirm('Are you sure you want to permanently delete this service booking from the lab registers?')) {
+      try {
+        await deleteDoc(doc(db, 'bookings', id));
+        setSelectedBooking(null);
+        fetchBookings();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // Service CRUD operations
+  const handleSaveService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const data = new FormData(form);
+    
+    const id = serviceModal.item?.id || data.get('slug') as string;
+    
+    // Parse modelPrices (Format: Model=Price|Model=Price)
+    const modelPricesRaw = data.get('modelPrices') as string || '';
+    const modelPrices = modelPricesRaw.split('|').filter(Boolean).map(item => {
+      const parts = item.split('=');
+      return { model: parts[0]?.trim() || '', price: parts[1]?.trim() || '' };
+    }).filter(i => i.model);
+
+    // Parse faqs (Format: Q=A|Q=A)
+    const faqsRaw = data.get('faqs') as string || '';
+    const faqs = faqsRaw.split('|').filter(Boolean).map(item => {
+      const parts = item.split('=');
+      return { question: parts[0]?.trim() || '', answer: parts[1]?.trim() || '' };
+    }).filter(i => i.question);
+
+    const srv: Service = {
+      id,
+      name: data.get('name') as string,
+      slug: data.get('slug') as string,
+      category: data.get('category') as string,
+      description: data.get('description') as string,
+      imageUrl: (data.get('imageUrl') as string)?.trim() || serviceModal.item?.imageUrl || '',
+      price: data.get('price') as string || '',
+      priceType: data.get('priceType') as any,
+      estimatedTime: data.get('estimatedTime') as string || '',
+      problemsCovered: (data.get('problemsCovered') as string).split(',').map(p => p.trim()).filter(Boolean),
+      symptoms: (data.get('symptoms') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
+      diagnosisProcess: data.get('diagnosisProcess') as string || '',
+      repairProcessSteps: (data.get('repairProcessSteps') as string)?.split('|').map(p => p.trim()).filter(Boolean) || [],
+      toolsAndTech: (data.get('toolsAndTech') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
+      supportedBrands: (data.get('supportedBrands') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
+      supportedModels: (data.get('supportedModels') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
+      modelPrices,
+      warranty: data.get('warranty') as string || '',
+      importantNotes: data.get('importantNotes') as string || '',
+      faqs,
+      active: data.get('active') === 'true',
+      featured: data.get('featured') === 'true',
+      displayOrder: parseInt(data.get('displayOrder') as string) || 5
+    };
+
+    try {
+      await setDoc(doc(db, 'services', id), srv);
+      setServiceModal({ open: false });
+      onRefreshData();
+      alert('Service saved successfully!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteService = async (id: string) => {
+    if (confirm('Are you sure you want to delete this service?')) {
+      try {
+        await deleteDoc(doc(db, 'services', id));
+        onRefreshData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // FAQ CRUD operations
+  const handleSaveFAQ = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const data = new FormData(form);
+
+    const id = faqModal.item?.id || `faq-${Date.now()}`;
+    const faq: FAQItem = {
+      id,
+      question: data.get('question') as string,
+      answer: data.get('answer') as string,
+      category: data.get('category') as string || 'General',
+      displayOrder: parseInt(data.get('displayOrder') as string) || 1
+    };
+
+    try {
+      await setDoc(doc(db, 'faqs', id), faq);
+      setFaqModal({ open: false });
+      onRefreshData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteFAQ = async (id: string) => {
+    if (confirm('Are you sure you want to delete this FAQ?')) {
+      try {
+        await deleteDoc(doc(db, 'faqs', id));
+        onRefreshData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // Slideshow CRUD operations
+  const handleSaveSlide = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const data = new FormData(form);
+
+    const id = slideModal.item?.id || `slide-${Date.now()}`;
+    const slide: SlideItem = {
+      id,
+      imageUrl: data.get('imageUrl') as string,
+      title: data.get('title') as string,
+      active: data.get('active') === 'true',
+      displayOrder: parseInt(data.get('displayOrder') as string) || 1
+    };
+
+    try {
+      await setDoc(doc(db, 'slideshow', id), slide);
+      setSlideModal({ open: false });
+      onRefreshData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteSlide = async (id: string) => {
+    if (confirm('Are you sure you want to delete this slideshow image?')) {
+      try {
+        await deleteDoc(doc(db, 'slideshow', id));
+        onRefreshData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleToggleSlideActive = async (id: string, currentActive: boolean) => {
+    try {
+      await updateDoc(doc(db, 'slideshow', id), { active: !currentActive });
+      onRefreshData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMoveSlide = async (index: number, direction: 'up' | 'down') => {
+    const sorted = [...slideshowList].sort((a, b) => a.displayOrder - b.displayOrder);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+    const currentItem = sorted[index];
+    const neighborItem = sorted[targetIndex];
+
+    const tempOrder = currentItem.displayOrder;
+    currentItem.displayOrder = neighborItem.displayOrder;
+    neighborItem.displayOrder = tempOrder;
+
+    try {
+      await updateDoc(doc(db, 'slideshow', currentItem.id), { displayOrder: currentItem.displayOrder });
+      await updateDoc(doc(db, 'slideshow', neighborItem.id), { displayOrder: neighborItem.displayOrder });
+      onRefreshData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Filtered Bookings list
+  const filteredBookings = bookings.filter(b => {
+    const matchesStatus = statusFilter === 'All' || b.status === statusFilter;
+    const matchesSearch = b.id.toLowerCase().includes(searchBooking.toLowerCase()) ||
+                          b.customerName.toLowerCase().includes(searchBooking.toLowerCase()) ||
+                          b.phone.includes(searchBooking) ||
+                          b.brand.toLowerCase().includes(searchBooking.toLowerCase()) ||
+                          b.model.toLowerCase().includes(searchBooking.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8 text-left text-slate-700 min-h-[80vh]">
+      {/* Sidebar navigation */}
+      <aside className="lg:w-72 bg-white border border-slate-100 rounded-2xl p-4 flex flex-col justify-between shadow-sm flex-shrink-0">
+        <div className="space-y-5">
+          <div className="border-b border-slate-100 pb-3 px-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 text-sm tracking-tight flex items-center gap-1.5 font-sans">
+                <span className="w-2.5 h-2.5 bg-[#0284C7] rounded-full animate-pulse" />
+                MOBO SAVIOR LAB
+              </h3>
+              <span className="px-2 py-0.5 bg-sky-50 text-[#0284C7] font-mono text-[9px] font-black rounded-full border border-sky-100">ADMIN</span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Saddam Technical Control Panel</p>
+          </div>
+
+          <nav className="space-y-4 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+            {/* CORE OPERATIONS */}
+            <div>
+              <span className="px-2.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">1. Core Operations</span>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'dashboard' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                    Overview Dashboard
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('bookings')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'bookings' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Bookings & Enquiries
+                  </span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${activeTab === 'bookings' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    {bookings.length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('branches')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'branches' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                    Branches / Locations
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('services')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'services' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Wrench className="w-3.5 h-3.5" />
+                    Services Catalog
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('categories')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'categories' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5" />
+                    Specialized Categories
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('brands')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'brands' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Tag className="w-3.5 h-3.5" />
+                    Phone Brands
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('models')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'models' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Smartphone className="w-3.5 h-3.5" />
+                    Phone Models
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('prices')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'prices' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    Pricing Manager
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* GALLERY & REVIEWS */}
+            <div>
+              <span className="px-2.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">2. Portfolio & Reviews</span>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => setActiveTab('gallery')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'gallery' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Image className="w-3.5 h-3.5" />
+                    Repair Gallery (Photos/Before-After)
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('videos')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'videos' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Video className="w-3.5 h-3.5" />
+                    Repair Videos Feed
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('reviews')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'reviews' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Customer Reviews & Google
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('offers')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'offers' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Star className="w-3.5 h-3.5" />
+                    Promotional Offers
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('trust')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'trust' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Shield className="w-3.5 h-3.5" />
+                    Why Choose Us (Trust Points)
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('faq')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'faq' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    SEO FAQ Accordion
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* BUSINESS & LOCATION */}
+            <div>
+              <span className="px-2.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">3. Business & Contact</span>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => setActiveTab('contact')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'contact' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5" />
+                    Address & Phone
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('hours')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'hours' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    Business Hours & Holiday
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('social')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'social' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Share2 className="w-3.5 h-3.5" />
+                    Social Media Profiles
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('maps')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'maps' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5" />
+                    Google Maps Link
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* WEBSITE & TELEMETRY */}
+            <div>
+              <span className="px-2.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">4. Website & SEO</span>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => setActiveTab('sections')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'sections' ? 'bg-[#0284C7] text-white shadow-sm ring-2 ring-sky-300' : 'text-slate-700 bg-sky-50/60 hover:bg-sky-100/80 font-black'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5 text-[#0284C7]" />
+                    <span>Website Sections / Visibility</span>
+                  </span>
+                  <span className="px-1.5 py-0.2 bg-sky-200 text-sky-900 font-extrabold text-[9px] rounded-md">LIVE</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('content')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'content' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    Website Page Content
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('seo')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'seo' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5" />
+                    Local SEO Settings
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('analytics')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'analytics' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <BarChart2 className="w-3.5 h-3.5" />
+                    Google Analytics GA4
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('slideshow')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'slideshow' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    Hero Background Slides
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('media')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'media' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Database className="w-3.5 h-3.5" />
+                    Media Storage Library
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* 5. FUTURE-READY CMS */}
+            <div>
+              <span className="px-2.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">5. Future-Ready CMS</span>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => setActiveTab('pages')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'pages' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    Pages CMS
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('blog')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'blog' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" />
+                    Repair Blogs CMS
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('navigation')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'navigation' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Compass className="w-3.5 h-3.5" />
+                    Menu Navigation
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('legal')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'legal' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" /> Legal Pages
+                  </span>
+                </button>
+
+                 <button
+                  onClick={() => setActiveTab('media-library')}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === 'media-library' ? 'bg-[#0284C7] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Database className="w-3.5 h-3.5" />
+                    Lab Media Library
+                  </span>
+                </button>
+              </div>
+            </div>
+          </nav>
+        </div>
+
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-rose-100 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors focus:outline-none"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout Administrative
+        </button>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-grow space-y-6">
+        {activeTab === 'sections' && (
+          <AdminSections onRefreshData={onRefreshData} />
+        )}
+
+        {activeTab === 'dashboard' && (
+          <div className="space-y-8">
+            {/* Quick Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Total Bookings</span>
+                <p className="text-2xl font-black text-slate-800 font-sans mt-1">{bookings.length}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Pending Review</span>
+                <p className="text-2xl font-black text-amber-500 font-sans mt-1">
+                  {bookings.filter(b => b.status === 'Pending').length}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Active Repairs</span>
+                <p className="text-2xl font-black text-indigo-500 font-sans mt-1">
+                  {bookings.filter(b => b.status === 'In Progress' || b.status === 'Confirmed').length}
+                </p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Ready Pickup</span>
+                <p className="text-2xl font-black text-emerald-600 font-sans mt-1">
+                  {bookings.filter(b => b.status === 'Ready for Pickup').length}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Actions Panel */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
+              <h3 className="font-extrabold text-slate-800 text-sm pb-1.5 border-b border-slate-100">
+                Quick Action Shortcuts
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <button
+                  onClick={() => { setActiveTab('services'); setServiceModal({ open: true }); }}
+                  className="p-3.5 bg-sky-50 hover:bg-sky-100 rounded-xl text-center flex flex-col items-center gap-1.5 transition-colors focus:outline-none"
+                >
+                  <Plus className="w-5 h-5 text-[#0284C7]" />
+                  <span className="text-[10px] font-bold text-[#0284C7] uppercase">Add New Service</span>
+                </button>
+                <button
+                  onClick={() => { setActiveTab('faq'); setFaqModal({ open: true }); }}
+                  className="p-3.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-center flex flex-col items-center gap-1.5 transition-colors focus:outline-none"
+                >
+                  <Plus className="w-5 h-5 text-slate-600" />
+                  <span className="text-[10px] font-bold text-slate-600 uppercase">Add FAQ Entry</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('bookings')}
+                  className="p-3.5 bg-indigo-50 hover:bg-indigo-100 rounded-xl text-center flex flex-col items-center gap-1.5 transition-colors focus:outline-none"
+                >
+                  <Calendar className="w-5 h-5 text-indigo-600" />
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase">Manage Bookings</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('content')}
+                  className="p-3.5 bg-emerald-50 hover:bg-emerald-100 rounded-xl text-center flex flex-col items-center gap-1.5 transition-colors focus:outline-none"
+                >
+                  <FileText className="w-5 h-5 text-emerald-600" />
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase">Branding & Logo</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Micro Dashboard Table teaser */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
+              <h3 className="font-extrabold text-slate-800 text-sm pb-1.5 border-b border-slate-100">
+                Recent Unprocessed Bookings
+              </h3>
+              {loadingBookings ? (
+                <div className="py-8 text-center text-xs text-slate-400">Loading bench logs...</div>
+              ) : bookings.filter(b => b.status === 'Pending').length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-400">
+                        <th className="py-2.5 font-bold uppercase">ID</th>
+                        <th className="py-2.5 font-bold uppercase">Customer</th>
+                        <th className="py-2.5 font-bold uppercase">Service / Brand</th>
+                        <th className="py-2.5 font-bold uppercase">Schedule</th>
+                        <th className="py-2.5 font-bold">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 font-medium">
+                      {bookings.filter(b => b.status === 'Pending').slice(0, 5).map(b => (
+                        <tr key={b.id} className="hover:bg-slate-50">
+                          <td className="py-2.5 font-mono text-[#0284C7] font-bold">{b.id}</td>
+                          <td className="py-2.5">{b.customerName}</td>
+                          <td className="py-2.5">{b.serviceName} ({b.brand} {b.model})</td>
+                          <td className="py-2.5">{b.preferredDate}</td>
+                          <td className="py-2.5">
+                            <button
+                              onClick={() => { setSelectedBooking(b); setActiveTab('bookings'); }}
+                              className="text-xs font-bold text-[#0284C7] hover:underline focus:outline-none"
+                            >
+                              Edit Status
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="py-8 text-center text-xs text-slate-400">No pending bookings waiting for review. All clear!</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'branches' && <AdminBranches />}
+
+        {activeTab === 'bookings' && <AdminServiceBookings />}
+        
+        {activeTab === 'services' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans">
+                Active Services Catalog CRUD
+              </h3>
+              <button
+                onClick={() => setServiceModal({ open: true })}
+                className="px-3 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-lg text-xs font-bold flex items-center gap-1 focus:outline-none"
+              >
+                <Plus className="w-3.5 h-3.5" /> New Service
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {services.map(srv => (
+                <div key={srv.id} className="flex items-center justify-between p-3.5 border border-slate-100 rounded-xl hover:bg-slate-50 gap-4 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-10 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-200">
+                      <img src={getServiceImage(srv)} alt={srv.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-slate-800 text-sm">{srv.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-mono">Category: {srv.category} | Price: {srv.price ? `₹${srv.price}` : 'Inspect estimate'}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setServiceModal({ open: true, item: srv })}
+                      className="p-1.5 text-slate-500 hover:text-[#0284C7] hover:bg-slate-100 rounded-lg"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteService(srv.id)}
+                      className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'categories' && (
+          <AdminCategories 
+            servicesList={services} 
+            onRefreshData={onRefreshData} 
+          />
+        )}
+
+        {activeTab === 'brands' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+            <AdminBrandsModels 
+              servicesList={services} 
+              onRefreshData={onRefreshData} 
+              defaultTab="brands"
+            />
+          </div>
+        )}
+
+        {activeTab === 'models' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+            <AdminBrandsModels 
+              servicesList={services} 
+              onRefreshData={onRefreshData} 
+              defaultTab="models"
+            />
+          </div>
+        )}
+
+        {activeTab === 'prices' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-[#0284C7]" />
+                Service & Model Pricing Management
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Configure starting base prices, estimate ranges, and model-specific repair costs across your catalog.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {services.map((svc) => (
+                <div key={svc.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-800 text-sm">{svc.name}</h4>
+                      <span className="px-2 py-0.5 bg-sky-50 text-[#0284C7] font-bold rounded text-[10px]">{svc.category}</span>
+                    </div>
+                    <p className="text-slate-500 text-[11px] line-clamp-1">{svc.description}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Pricing Mode: <span className="font-bold text-slate-700">{svc.priceType || 'Starting Price'}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Starting Cost</span>
+                      <span className="text-sm font-black text-emerald-600">
+                        {typeof svc.price === 'number' ? `₹${svc.price}` : svc.price || '₹999'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setServiceModal({ open: true, item: svc })}
+                      className="px-3 py-2 bg-white border border-slate-200 hover:border-[#0284C7] text-slate-700 hover:text-[#0284C7] rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> Edit Price
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'faq' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans">
+                SEO FAQ Accordion Management
+              </h3>
+              <button
+                onClick={() => setFaqModal({ open: true })}
+                className="px-3 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-lg text-xs font-bold flex items-center gap-1 focus:outline-none"
+              >
+                <Plus className="w-3.5 h-3.5" /> New FAQ
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {faqs.map(faq => (
+                <div key={faq.id} className="p-3.5 border border-slate-100 rounded-xl flex items-start justify-between gap-4 text-xs">
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-slate-800">{faq.question}</h4>
+                    <p className="text-slate-500 line-clamp-2 leading-normal">{faq.answer}</p>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => setFaqModal({ open: true, item: faq })}
+                      className="p-1.5 text-slate-400 hover:text-[#0284C7] rounded-lg hover:bg-slate-50"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteFAQ(faq.id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'content' && (
+          <div className="space-y-6">
+            {/* Branding Management */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+              <h3 className="font-extrabold text-slate-800 text-sm pb-1.5 border-b border-slate-100">
+                Administrative Branding & Logo Customizer
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-slate-500 mb-1">Brand Name</label>
+                  <input
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Custom Logo Image URL</label>
+                  <input
+                    type="text"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="e.g. https://domain.com/logo.png"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-500 mb-1">Brand Tagline</label>
+                  <input
+                    type="text"
+                    value={tagline}
+                    onChange={(e) => setTagline(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleSaveBranding}
+                disabled={saveLoading}
+                className="px-4 py-2 bg-[#0284C7] text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" /> Save Branding
+              </button>
+            </div>
+
+            {/* Location, Contact & Social Media Settings */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+              <div className="border-b border-slate-100 pb-2">
+                <h3 className="font-extrabold text-slate-800 text-sm font-sans">
+                  Location, Contact & Social Media Links
+                </h3>
+                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                  Configure the official Google Maps location, phone numbers, and verified social media profiles displayed across the website.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-600 font-bold mb-1">Physical Lab Address</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Room No B4, Super Market, Hattola More, Purulia, West Bengal 723101"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Support Phone Number</label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="081675 49092"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">WhatsApp Phone Line</label>
+                  <input
+                    type="text"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="081675 49092"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-600 font-bold">Google Maps URL (Get Directions & Location)</label>
+                    {mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-sky-600 hover:text-sky-700 font-bold underline"
+                      >
+                        Verify / Test Link ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={mapsUrl}
+                    onChange={(e) => setMapsUrl(e.target.value)}
+                    placeholder="https://maps.app.goo.gl/tU41BvTCk3dRAn6r9"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-sky-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Used by 'Get Directions' buttons, Home page location CTA, contact page and footer location links.
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-600 font-bold">Facebook Profile / Page URL</label>
+                    {facebook && (
+                      <a
+                        href={facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-blue-600 hover:text-blue-700 font-bold underline"
+                      >
+                        Verify / Test Link ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={facebook}
+                    onChange={(e) => setFacebook(e.target.value)}
+                    placeholder="https://www.facebook.com/share/19aL5sjb28/"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-600 font-bold">Instagram Profile URL</label>
+                    {instagram && (
+                      <a
+                        href={instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-pink-600 hover:text-pink-700 font-bold underline"
+                      >
+                        Verify / Test Link ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    placeholder="https://www.instagram.com/saddam617technical?stkn=MWh2MXNnZjZwNXI5MQ=="
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-pink-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-600 font-bold">YouTube Channel URL (Optional)</label>
+                    {youtube && (
+                      <a
+                        href={youtube}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-red-600 hover:text-red-700 font-bold underline"
+                      >
+                        Verify / Test Link ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={youtube}
+                    onChange={(e) => setYoutube(e.target.value)}
+                    placeholder="https://www.youtube.com/@channel (Optional)"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-red-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Leave blank if not provided. Fake or placeholder links will not be shown on the website.
+                  </p>
+                </div>
+
+                <div className="sm:col-span-2 bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <label className="block text-emerald-950 font-bold text-xs">WhatsApp Channel URL</label>
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                        Broadcast Channel
+                      </span>
+                    </div>
+                    {whatsappChannelUrl && (
+                      <a
+                        href={whatsappChannelUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center gap-1"
+                      >
+                        Verify / Test Channel Link ↗
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={whatsappChannelUrl}
+                    onChange={(e) => setWhatsappChannelUrl(e.target.value)}
+                    placeholder="https://whatsapp.com/channel/0029VaRdZK80QeahHriOTD1K"
+                    className="w-full px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl font-mono text-[11px] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-emerald-800/80 mt-1 font-medium">
+                    Official WhatsApp Channel URL for announcements, repair updates and offers. Separate from customer enquiry chat ("WhatsApp Now").
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleSaveContact}
+                  disabled={saveLoading}
+                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Location & Social Settings</span>
+                </button>
+              </div>
+            </div>
+
+            {/* General Home Content */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+              <h3 className="font-extrabold text-slate-800 text-sm pb-1.5 border-b border-slate-100">
+                Front-End Page Copy & Storytelling
+              </h3>
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-500 mb-1">Hero Heading Title</label>
+                  <input
+                    type="text"
+                    value={heroTitle}
+                    onChange={(e) => setHeroTitle(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Hero Supporting Text</label>
+                  <textarea
+                    rows={2}
+                    value={heroDesc}
+                    onChange={(e) => setHeroDesc(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">About Biography Description</label>
+                  <textarea
+                    rows={4}
+                    value={aboutText}
+                    onChange={(e) => setAboutText(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl leading-relaxed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">About Quote Highlight</label>
+                  <input
+                    type="text"
+                    value={aboutHighlight}
+                    onChange={(e) => setAboutHighlight(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleSaveContent}
+                disabled={saveLoading}
+                className="px-4 py-2 bg-[#0284C7] text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" /> Save Front-End Copy
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'seo' && (
+          <AdminSEOSettings
+            seoSettings={seoSettings}
+            onSave={async (updatedSettings) => {
+              await setDoc(doc(db, 'settings', 'seo'), updatedSettings);
+              onRefreshData();
+            }}
+          />
+        )}
+
+        {activeTab === 'slideshow' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="text-left">
+                <h3 className="font-extrabold text-slate-800 text-sm font-sans">
+                  Hero Background Slideshow Management
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">Manage the 10 custom AI-generated background slideshow images</p>
+              </div>
+              <button
+                onClick={() => setSlideModal({ open: true, item: null })}
+                className="px-3 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-lg text-xs font-bold flex items-center gap-1 focus:outline-none"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Slide
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {[...slideshowList].sort((a, b) => a.displayOrder - b.displayOrder).map((slide, idx, arr) => (
+                <div key={slide.id} className="p-4 border border-slate-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                  <div className="flex items-center gap-4 text-left">
+                    <div className="w-16 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
+                      <img src={slide.imageUrl} alt={slide.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-slate-800">{slide.title}</h4>
+                      <p className="text-[10px] text-slate-400 font-mono leading-none">ID: {slide.id} | Order: {slide.displayOrder}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {/* Active Switch Badge */}
+                    <button
+                      onClick={() => handleToggleSlideActive(slide.id, slide.active)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold select-none transition-colors ${
+                        slide.active 
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
+                          : 'bg-slate-100 text-slate-400 border border-slate-200'
+                      }`}
+                    >
+                      {slide.active ? 'Enabled' : 'Disabled'}
+                    </button>
+
+                    {/* Move Up Button */}
+                    <button
+                      onClick={() => handleMoveSlide(idx, 'up')}
+                      disabled={idx === 0}
+                      className="p-1.5 text-slate-400 hover:text-[#0284C7] disabled:opacity-20 rounded-lg hover:bg-slate-50"
+                      title="Move Up"
+                    >
+                      <svg className="w-3.5 h-3.5 transform rotate-180" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+
+                    {/* Move Down Button */}
+                    <button
+                      onClick={() => handleMoveSlide(idx, 'down')}
+                      disabled={idx === arr.length - 1}
+                      className="p-1.5 text-slate-400 hover:text-[#0284C7] disabled:opacity-20 rounded-lg hover:bg-slate-50"
+                      title="Move Down"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+
+                    {/* Edit button */}
+                    <button
+                      onClick={() => setSlideModal({ open: true, item: slide })}
+                      className="p-1.5 text-slate-400 hover:text-[#0284C7] rounded-lg hover:bg-slate-50"
+                      title="Edit"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      onClick={() => handleDeleteSlide(slide.id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'contact' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-2">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
+                <Phone className="w-4 h-4 text-[#0284C7]" />
+                Lab Address & Primary Support Lines
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Official shop location and direct telephone contact info shown on customer headers, hero section, contact page, and footer.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="sm:col-span-2">
+                <label className="block text-slate-600 font-bold mb-1">Physical Lab Address</label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Room No B4, Super Market, Hattola More, Purulia, West Bengal 723101"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Support Call Line</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="081675 49092"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">WhatsApp Business Number</label>
+                <input
+                  type="text"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  placeholder="081675 49092"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveContact}
+              disabled={saveLoading}
+              className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all"
+            >
+              <Save className="w-4 h-4" /> Save Contact Info
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'hours' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-2">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#0284C7]" />
+                Store Business Hours & Weekly Holiday Schedule
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Set operating times and holiday notes displayed on the contact card and footer.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Monday - Friday Hours</label>
+                <input
+                  type="text"
+                  value={monFriHours}
+                  onChange={(e) => setMonFriHours(e.target.value)}
+                  placeholder="10:00 AM - 08:30 PM"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Saturday Hours</label>
+                <input
+                  type="text"
+                  value={satHours}
+                  onChange={(e) => setSatHours(e.target.value)}
+                  placeholder="10:00 AM - 08:30 PM"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Sunday Schedule</label>
+                <input
+                  type="text"
+                  value={sunHours}
+                  onChange={(e) => setSunHours(e.target.value)}
+                  placeholder="Closed / By Appointment"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Weekly Holiday Day</label>
+                <input
+                  type="text"
+                  value={weeklyHoliday}
+                  onChange={(e) => setWeeklyHoliday(e.target.value)}
+                  placeholder="Thursday"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-600 font-bold mb-1">Store Announcement / Express Service Note</label>
+                <input
+                  type="text"
+                  value={hoursNote}
+                  onChange={(e) => setHoursNote(e.target.value)}
+                  placeholder="Open all days except public festival holidays. Express bench service available."
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveHours}
+              disabled={saveLoading}
+              className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all"
+            >
+              <Save className="w-4 h-4" /> Save Schedule & Hours
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'social' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-2">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-[#0284C7]" />
+                Official Social Media Channels
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Verified social links attached to Saddam Technical's brand presence across Facebook, Instagram, and YouTube.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Facebook Page / Profile URL</label>
+                <input
+                  type="text"
+                  value={facebook}
+                  onChange={(e) => setFacebook(e.target.value)}
+                  placeholder="https://www.facebook.com/share/19aL5sjb28/"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Instagram Profile URL</label>
+                <input
+                  type="text"
+                  value={instagram}
+                  onChange={(e) => setInstagram(e.target.value)}
+                  placeholder="https://www.instagram.com/saddam617technical"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-pink-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-600 font-bold mb-1">YouTube Channel URL (Optional)</label>
+                <input
+                  type="text"
+                  value={youtube}
+                  onChange={(e) => setYoutube(e.target.value)}
+                  placeholder="https://www.youtube.com/@saddamtechnical"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-red-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2 bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <label className="block text-emerald-950 font-bold text-xs">WhatsApp Channel URL</label>
+                    <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      Broadcast Channel
+                    </span>
+                  </div>
+                  {whatsappChannelUrl && (
+                    <a
+                      href={whatsappChannelUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold underline flex items-center gap-1"
+                    >
+                      Verify / Test Channel Link ↗
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={whatsappChannelUrl}
+                  onChange={(e) => setWhatsappChannelUrl(e.target.value)}
+                  placeholder="https://whatsapp.com/channel/0029VaRdZK80QeahHriOTD1K"
+                  className="w-full px-3.5 py-2.5 bg-white border border-emerald-200 rounded-xl font-mono text-[11px] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+                <p className="text-[10px] text-emerald-800/80 mt-1 font-medium">
+                  Official WhatsApp Channel URL for announcements, repair updates and offers. Separate from customer enquiry chat ("WhatsApp Now").
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveContact}
+              disabled={saveLoading}
+              className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all"
+            >
+              <Save className="w-4 h-4" /> Save Social Links
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'maps' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-2">
+              <h3 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#0284C7]" />
+                Google Maps Location & Get Directions Integration
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Exact short link from Google Maps for customer directions and Purulia shop navigation.
+              </p>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-600 font-bold">Google Maps Share URL</label>
+                  {mapsUrl && (
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-sky-600 hover:text-sky-700 font-bold underline flex items-center gap-1"
+                    >
+                      <span>Verify Location Link</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              <div className="mt-4">
+                <label className="block text-slate-600 font-bold mb-1">Google Maps Embed iframe URL (src)</label>
+                <input
+                  type="text"
+                  value={mapIframeUrl}
+                  onChange={(e) => setMapIframeUrl(e.target.value)}
+                  placeholder="https://www.google.com/maps/embed?pb=..."
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+                <input
+                  type="text"
+                  value={mapsUrl}
+                  onChange={(e) => setMapsUrl(e.target.value)}
+                  placeholder="https://maps.app.goo.gl/tU41BvTCk3dRAn6r9"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-[11px] focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveContact}
+              disabled={saveLoading}
+              className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all"
+            >
+              <Save className="w-4 h-4" /> Save Google Maps URL
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'analytics' && (
+          <AdminAnalyticsDashboard />
+        )}
+
+        {(activeTab === 'gallery' || activeTab === 'videos' || activeTab === 'media') && (
+          <AdminGalleryManager />
+        )}
+
+        {activeTab === 'reviews' && (
+          <AdminReviewsManager />
+        )}
+
+        {activeTab === 'offers' && (
+          <AdminOffers />
+        )}
+
+        {activeTab === 'prices' && (
+          <AdminPrices />
+        )}
+
+        {activeTab === 'trust' && (
+          <AdminTrustSection />
+        )}
+
+        {activeTab === 'pages' && (
+          <AdminPages onRefreshData={onRefreshData} />
+        )}
+
+        {activeTab === 'blog' && (
+          <AdminBlog onRefreshData={onRefreshData} />
+        )}
+
+        {activeTab === 'navigation' && (
+          <AdminNavigation />
+        )}
+
+        {activeTab === 'legal' && (
+          <AdminLegalPages />
+        )}
+
+        {activeTab === 'media-library' && (
+          <AdminMediaLibrary />
+        )}
+      </main>
+
+      {/* 1. Service CRUD Modal */}
+      {serviceModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto pt-20">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-4xl w-full space-y-5 text-xs text-slate-700 shadow-2xl relative my-8">
+            <button onClick={() => setServiceModal({ open: false })} className="absolute top-4 right-4 p-1.5 rounded hover:bg-slate-50 text-slate-400">
+              <X className="w-4.5 h-4.5" />
+            </button>
+            <h3 className="font-extrabold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              {serviceModal.item ? 'Edit Service Details' : 'Add New Service'}
+            </h3>
+
+            <form onSubmit={handleSaveService} className="space-y-6">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
+                <h4 className="md:col-span-2 font-bold text-slate-800">Basic Information</h4>
+                <div>
+                  <label className="block text-slate-500 mb-1">Service Name *</label>
+                  <input type="text" name="name" required defaultValue={serviceModal.item?.name || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">URL Slug *</label>
+                  <input type="text" name="slug" required disabled={!!serviceModal.item} defaultValue={serviceModal.item?.slug || ''} placeholder="e.g. iphone-repair" className="w-full px-3.5 py-2 border border-slate-200 rounded-xl font-mono" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Category *</label>
+                  <input type="text" name="category" required defaultValue={serviceModal.item?.category || 'Hardware'} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Image URL</label>
+                  <ImageUploader 
+                    label="Service Image" 
+                    value={serviceFormImageUrl} 
+                    onChange={setServiceFormImageUrl} 
+                    folder="service_images"
+                  />
+                  <input type="hidden" name="imageUrl" value={serviceFormImageUrl} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-slate-500 mb-1">Short Description *</label>
+                  <textarea name="description" required defaultValue={serviceModal.item?.description || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl h-20"></textarea>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 border border-slate-200 rounded-xl">
+                <h4 className="md:col-span-3 font-bold text-slate-800">Pricing & Timing</h4>
+                <div>
+                  <label className="block text-slate-500 mb-1">Price</label>
+                  <input type="text" name="price" defaultValue={serviceModal.item?.price || ''} placeholder="e.g. 999" className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Pricing Type *</label>
+                  <select name="priceType" defaultValue={serviceModal.item?.priceType || 'upon_inspection'} className="w-full px-3 py-2 border border-slate-200 rounded-xl">
+                    <option value="exact">Exact Price</option>
+                    <option value="estimate">Estimate Cost</option>
+                    <option value="upon_inspection">Upon Inspection</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Estimated Time *</label>
+                  <input type="text" name="estimatedTime" defaultValue={serviceModal.item?.estimatedTime || '1-3 Hours'} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="block text-slate-500 mb-1">Model-wise Prices (Format: Model=Price | Model=Price)</label>
+                  <textarea name="modelPrices" defaultValue={serviceModal.item?.modelPrices?.map(m => m.model + '=' + m.price).join(' | ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl h-16"></textarea>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
+                <h4 className="md:col-span-2 font-bold text-slate-800">Details & Process</h4>
+                <div className="md:col-span-2">
+                  <label className="block text-slate-500 mb-1">Symptoms / Problems Covered (Comma separated) *</label>
+                  <input type="text" name="symptoms" required defaultValue={serviceModal.item?.symptoms?.join(', ') || serviceModal.item?.problemsCovered?.join(', ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                  <input type="hidden" name="problemsCovered" value={serviceModal.item?.problemsCovered?.join(',') || ''} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-slate-500 mb-1">Diagnosis Process Overview</label>
+                  <textarea name="diagnosisProcess" defaultValue={serviceModal.item?.diagnosisProcess || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl h-16"></textarea>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-slate-500 mb-1">Repair Process Steps (Use | to separate steps)</label>
+                  <textarea name="repairProcessSteps" defaultValue={serviceModal.item?.repairProcessSteps?.join(' | ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl h-20"></textarea>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Tools & Technology (Comma separated)</label>
+                  <input type="text" name="toolsAndTech" defaultValue={serviceModal.item?.toolsAndTech?.join(', ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Warranty Information</label>
+                  <input type="text" name="warranty" defaultValue={serviceModal.item?.warranty || 'Standard Testing'} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 border border-slate-200 rounded-xl">
+                <h4 className="md:col-span-2 font-bold text-slate-800">Additional Meta</h4>
+                <div>
+                  <label className="block text-slate-500 mb-1">Supported Brands (Comma separated)</label>
+                  <input type="text" name="supportedBrands" defaultValue={serviceModal.item?.supportedBrands?.join(', ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Supported Models (Comma separated)</label>
+                  <input type="text" name="supportedModels" defaultValue={serviceModal.item?.supportedModels?.join(', ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-slate-500 mb-1">FAQs (Format: Question=Answer | Question=Answer)</label>
+                  <textarea name="faqs" defaultValue={serviceModal.item?.faqs?.map(f => f.question + '=' + f.answer).join(' | ') || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl h-20"></textarea>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-slate-500 mb-1">Important Notes (Disclaimer)</label>
+                  <input type="text" name="importantNotes" defaultValue={serviceModal.item?.importantNotes || ''} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Display Rank Order *</label>
+                  <input type="number" name="displayOrder" required defaultValue={serviceModal.item?.displayOrder || 5} className="w-full px-3.5 py-2 border border-slate-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Active Status</label>
+                  <select name="active" defaultValue={serviceModal.item ? String(serviceModal.item.active) : 'true'} className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white">
+                    <option value="true">Active & Visible</option>
+                    <option value="false">Hidden / Disabled</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Featured Service</label>
+                  <select name="featured" defaultValue={serviceModal.item ? String(serviceModal.item.featured) : 'false'} className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                <button type="submit" className="flex-1 py-3 bg-[#0284C7] text-white font-bold rounded-xl hover:bg-[#0369A1]">
+                  Save Service Details
+                </button>
+                <button type="button" onClick={() => setServiceModal({ open: false })} className="px-6 py-3 border border-slate-200 text-slate-500 font-bold rounded-xl hover:bg-slate-50">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+      )}
+
+      {/* 2. FAQ CRUD Modal */}
+      {faqModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-4 text-xs text-slate-700 relative shadow-2xl">
+            <button onClick={() => setFaqModal({ open: false })} className="absolute top-4 right-4 p-1.5 rounded hover:bg-slate-50 text-slate-400">
+              <X className="w-4.5 h-4.5" />
+            </button>
+            <h3 className="font-extrabold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              {faqModal.item ? 'Edit FAQ' : 'Add New FAQ Accordion'}
+            </h3>
+
+            <form onSubmit={handleSaveFAQ} className="space-y-4">
+              <div>
+                <label className="block text-slate-500 mb-1">Question / Inquiry *</label>
+                <input
+                  type="text"
+                  name="question"
+                  required
+                  defaultValue={faqModal.item?.question || ''}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Detailed Answer *</label>
+                <textarea
+                  name="answer"
+                  required
+                  rows={4}
+                  defaultValue={faqModal.item?.answer || ''}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl leading-normal"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Category</label>
+                  <input
+                    type="text"
+                    name="category"
+                    defaultValue={faqModal.item?.category || 'Services'}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Display Rank Order</label>
+                  <input
+                    type="number"
+                    name="displayOrder"
+                    defaultValue={faqModal.item?.displayOrder || 1}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl"
+              >
+                Save FAQ
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Slideshow CRUD Modal */}
+      {slideModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-4 text-xs text-slate-700 relative shadow-2xl">
+            <button onClick={() => setSlideModal({ open: false })} className="absolute top-4 right-4 p-1.5 rounded hover:bg-slate-50 text-slate-400">
+              <X className="w-4.5 h-4.5" />
+            </button>
+            <h3 className="font-extrabold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              {slideModal.item ? 'Edit Slideshow Image' : 'Add New Slideshow Image'}
+            </h3>
+
+            <form onSubmit={handleSaveSlide} className="space-y-4">
+              <div>
+                <label className="block text-slate-500 mb-1">Slide Title / Description *</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  defaultValue={slideModal.item?.title || ''}
+                  placeholder="e.g. iPhone Repair Expert"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Image URL / Local Asset Path *</label>
+                <ImageUploader 
+                  label="Slide Image" 
+                  value={slideFormImageUrl} 
+                  onChange={setSlideFormImageUrl} 
+                  folder="hero_slides"
+                />
+                <input type="hidden" name="imageUrl" value={slideFormImageUrl} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Display Order</label>
+                  <input
+                    type="number"
+                    name="displayOrder"
+                    required
+                    defaultValue={slideModal.item?.displayOrder ?? (slideshowList.length + 1)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Status</label>
+                  <select
+                    name="active"
+                    defaultValue={slideModal.item?.active === false ? 'false' : 'true'}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-bold"
+                  >
+                    <option value="true">Enabled / Visible</option>
+                    <option value="false">Disabled / Hidden</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl"
+              >
+                Save Slide Details
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* 4. Gallery Photo CRUD Modal */}
+      {galleryModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-4 text-xs text-slate-700 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button 
+              onClick={() => setGalleryModal({ open: false })} 
+              className="absolute top-4 right-4 p-1.5 rounded hover:bg-slate-50 text-slate-400"
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
+            <h3 className="font-extrabold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              {galleryModal.item ? 'Edit Photo Details' : 'Add New Portfolio Photo'}
+            </h3>
+
+            <form onSubmit={handleSaveGalleryItem} className="space-y-4">
+              <div>
+                <label className="block text-slate-500 mb-1">Upload Photo File (Firebase Storage) *</label>
+                <input
+                  type="file"
+                  name="imageFile"
+                  accept="image/*"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50/50 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-extrabold file:bg-[#E0F2FE] file:text-[#0284C7] hover:file:bg-sky-100 file:cursor-pointer"
+                />
+                <p className="text-[9px] text-slate-400 mt-1">Recommended: Clear, non-blurry close-ups of micro-soldering, IC, or high-end display laminations.</p>
+              </div>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-100"></div>
+                <span className="flex-shrink mx-3 text-[9px] text-slate-400 font-bold uppercase tracking-wider">or specify public URL</span>
+                <div className="flex-grow border-t border-slate-100"></div>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Direct Image URL</label>
+                <input
+                  type="text"
+                  name="imageUrl"
+                  defaultValue={galleryModal.item?.imageUrl || ''}
+                  placeholder="e.g. https://images.unsplash.com/..."
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl font-mono text-[10px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Title *</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  defaultValue={galleryModal.item?.title || ''}
+                  placeholder="e.g. iPhone 14 Pro Max Backglass Laser Repair"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Description *</label>
+                <textarea
+                  name="description"
+                  required
+                  rows={3}
+                  defaultValue={galleryModal.item?.description || ''}
+                  placeholder="e.g. Step-by-step restoration showing the clean high-precision laser separation..."
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl leading-normal text-slate-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Category Category *</label>
+                  <input
+                    type="text"
+                    name="category"
+                    required
+                    defaultValue={galleryModal.item?.category || 'Motherboard'}
+                    placeholder="e.g. Screens, Soldering"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Display Rank Order *</label>
+                  <input
+                    type="number"
+                    name="displayOrder"
+                    required
+                    defaultValue={galleryModal.item?.displayOrder ?? (gallery.length + 1)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Status Visbility</label>
+                  <select
+                    name="active"
+                    defaultValue={galleryModal.item?.active === false ? 'false' : 'true'}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-bold"
+                  >
+                    <option value="true">Enabled / Visible</option>
+                    <option value="false">Hidden / Draft</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Showcase On Home</label>
+                  <select
+                    name="featured"
+                    defaultValue={galleryModal.item?.featured === true ? 'true' : 'false'}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-bold"
+                  >
+                    <option value="false">Standard Item</option>
+                    <option value="true">Featured</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={uploadLoading}
+                className="w-full py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-black rounded-xl shadow flex items-center justify-center gap-1.5"
+              >
+                {uploadLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    Uploading & Bundling...
+                  </>
+                ) : (
+                  'Publish Portfolio Photo'
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Video Portfolio CRUD Modal */}
+      {videoModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-4 text-xs text-slate-700 relative shadow-2xl max-h-[90vh] overflow-y-auto">
+            <button 
+              onClick={() => setVideoModal({ open: false })} 
+              className="absolute top-4 right-4 p-1.5 rounded hover:bg-slate-50 text-slate-400"
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
+            <h3 className="font-extrabold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              {videoModal.item ? 'Edit Video Details' : 'Add New Portfolio Video'}
+            </h3>
+
+            <form onSubmit={handleSaveVideoItem} className="space-y-4">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Video URL *</label>
+                <input
+                  type="text"
+                  name="videoUrl"
+                  required
+                  defaultValue={videoModal.item?.videoUrl || ''}
+                  placeholder="Paste YouTube, Facebook or Instagram video link"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#0284C7]/20 focus:border-[#0284C7]"
+                />
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supported Sources:</span>
+                  <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded-md border border-red-200">
+                    YouTube
+                  </span>
+                  <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200">
+                    Facebook
+                  </span>
+                  <span className="px-2 py-0.5 bg-pink-50 text-pink-700 text-[10px] font-bold rounded-md border border-pink-200">
+                    Instagram
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Videos must be provided as a public YouTube, Facebook, or Instagram link. Local device video uploading is disabled.</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Video Title *</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  defaultValue={videoModal.item?.title || ''}
+                  placeholder="e.g. iPad Pro CPU Swapping Microscope Demonstration"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Description *</label>
+                <textarea
+                  name="description"
+                  required
+                  rows={3}
+                  defaultValue={videoModal.item?.description || ''}
+                  placeholder="e.g. Watch Saddam Bhai execute microsoldering repairs at 45x magnification..."
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl leading-normal text-slate-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Category *</label>
+                  <input
+                    type="text"
+                    name="category"
+                    required
+                    defaultValue={videoModal.item?.category || 'Motherboard'}
+                    placeholder="e.g. Screens, Soldering"
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Display Rank Order *</label>
+                  <input
+                    type="number"
+                    name="displayOrder"
+                    required
+                    defaultValue={videoModal.item?.displayOrder ?? (videos.length + 1)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-xl font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-500 mb-1">Status Visbility</label>
+                  <select
+                    name="active"
+                    defaultValue={videoModal.item?.active === false ? 'false' : 'true'}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-bold"
+                  >
+                    <option value="true">Enabled / Visible</option>
+                    <option value="false">Hidden / Draft</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-500 mb-1">Showcase On Home</label>
+                  <select
+                    name="featured"
+                    defaultValue={videoModal.item?.featured === true ? 'true' : 'false'}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white font-bold"
+                  >
+                    <option value="false">Standard Item</option>
+                    <option value="true">Featured</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={uploadLoading}
+                className="w-full py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-black rounded-xl shadow flex items-center justify-center gap-1.5"
+              >
+                {uploadLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    {uploadProgress > 0 && uploadProgress < 100 
+                      ? `Uploading Video (${uploadProgress}%)...` 
+                      : 'Saving Video Item...'}
+                  </>
+                ) : (
+                  'Publish Portfolio Video'
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Unified Media Preview Overlay Lightbox */}
+        {activeTab === 'offers' && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+            <AdminOffers />
+          </div>
+        )}
+
+      {previewMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+          <div className="relative max-w-3xl w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <button
+              onClick={() => setPreviewMedia(null)}
+              className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/40 text-white hover:bg-black/60 transition-colors focus:outline-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {previewMedia.type === 'photo' ? (
+              <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+                <img 
+                  src={previewMedia.url} 
+                  alt={previewMedia.title} 
+                  className="max-h-[70vh] object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            ) : (
+              <div className="relative aspect-video bg-black w-full flex items-center justify-center overflow-hidden">
+                <EmbeddedVideoPlayer videoUrl={previewMedia.url} title={previewMedia.title} />
+              </div>
+            )}
+
+            <div className="p-6 bg-white text-slate-700 text-left space-y-1">
+              <h4 className="text-lg font-black text-slate-900 font-sans">{previewMedia.title}</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">{previewMedia.description}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

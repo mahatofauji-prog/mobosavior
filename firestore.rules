@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the user is logged in
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'admin@mobosavior.com';
+    }
+
+    // Public content & app collections: read and write allowed for client operation and seeding
+    match /services/{serviceId} {
+      allow read, write: if true;
+    }
+    match /faqs/{faqId} {
+      allow read, write: if true;
+    }
+    match /reviews/{reviewId} {
+      allow read, write: if true;
+    }
+    match /gallery/{itemId} {
+      allow read, write: if true;
+    }
+    match /videos/{videoId} {
+      allow read, write: if true;
+    }
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+    match /slideshow/{slideId} {
+      allow read, write: if true;
+    }
+    match /offers/{offerId} {
+      allow read, write: if true;
+    }
+    match /offer_categories/{catId} {
+      allow read, write: if true;
+    }
+    match /trust_points/{trustId} {
+      allow read, write: if true;
+    }
+    match /brands/{brandId} {
+      allow read, write: if true;
+    }
+    match /models/{modelId} {
+      allow read, write: if true;
+    }
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+    match /branches/{branchId} {
+      allow read, write: if true;
+    }
+    match /branch_prices/{priceId} {
+      allow read, write: if true;
+    }
+    match /prices/{priceId} {
+      allow read, write: if true;
+    }
+    match /legal_pages/{pageId} {
+      allow read, write: if true;
+    }
+    match /legal_sections/{sectionId} {
+      allow read, write: if true;
+    }
+    match /blog_posts/{postId} {
+      allow read, write: if true;
+    }
+    match /blog_categories/{catId} {
+      allow read, write: if true;
+    }
+    match /pages/{pageId} {
+      allow read, write: if true;
+    }
+    match /navigation_items/{navId} {
+      allow read, write: if true;
+    }
+    match /website_sections/{secId} {
+      allow read, write: if true;
+    }
+    match /media_library/{mediaId} {
+      allow read, write: if true;
+    }
+    
+    // Bookings (Old)
+    match /bookings/{bookingId} {
+      allow read, write: if true;
+    }
+    
+    // Enquiries
+    match /enquiries/{enquiryId} {
+      allow read, write: if true;
+    }
+
+    // NEW BOOKING SYSTEM
+    match /service_bookings/{bookingId} {
+      allow read, write: if true;
+    }
+    match /service_bookings_public/{serviceId} {
+      allow read, write: if true;
+    }
+  }
+}

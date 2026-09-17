@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Lock, Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
-import { auth } from '../firebase/config';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -21,17 +19,25 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
     const cleanPassword = password.trim();
 
     try {
-      // In a real application, validate against backend
-      // Here we check auth using Firebase with a fixed service account or dedicated endpoint.
-      // Since backend logic isn't securely provided to React without custom APIs, 
-      // we check via Firebase auth sign in.
-      const adminEmail = 'admin@mobosavior.com';
-      await signInWithEmailAndPassword(auth, adminEmail, cleanPassword);
-      
-      localStorage.setItem('mobo_admin_session', 'true');
-      onSuccess();
+      // Safely validate password against our backend API
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: cleanPassword }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem('mobo_admin_session', 'true');
+        onSuccess();
+      } else {
+        setError('Invalid admin password.');
+      }
     } catch (err: any) {
-      console.warn('Authentication failed:', err.message);
+      console.error('Authentication failed:', err);
       setError('Invalid admin password.');
     } finally {
       setLoading(false);

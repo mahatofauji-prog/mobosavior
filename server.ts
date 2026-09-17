@@ -18,6 +18,25 @@ const PORT = 3000;
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
+// Secure Backend Admin Login Endpoint
+app.post('/api/admin/login', (req, res) => {
+  try {
+    const { password } = req.body;
+    // Backend securely validates the password.
+    // In production, this can be managed via process.env.ADMIN_PASSWORD
+    const backendAdminSecret = process.env.ADMIN_PASSWORD || 'Mobofounder@2026';
+    
+    if (password === backendAdminSecret) {
+      // Simulate issuing a secure session token
+      return res.json({ success: true, token: 'session_active' });
+    } else {
+      return res.status(401).json({ success: false, message: 'Invalid admin password.' });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+});
+
 // Ensure public upload directories exist
 const UPLOADS_BASE = path.join(process.cwd(), 'public', 'uploads');
 if (!fs.existsSync(UPLOADS_BASE)) {

@@ -253,7 +253,7 @@ export default function Footer({
                 href="https://www.manisolution.com/" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-slate-400 hover:text-slate-200 transition-colors"
+                className="text-pink-500 font-bold hover:text-pink-400 transition-colors"
               >
                 MANI Solution
               </a>

@@ -486,16 +486,26 @@ export default function App() {
       <SEOHead seoSettings={seo} currentRoute={currentRoute} />
       <LocalBusinessSchema contact={contact} />
 
-      {/* 2. Primary Navigation Bar Header */}
-      <Navbar onNavigate={handleCustomNavigate} currentRoute={currentRoute} branding={branding} contact={contact} navItems={navItems} />
+      {/* Conditionally Render Public Layout Wrapper */}
+      {currentRoute !== 'moboadmin2026' ? (
+        <>
+          {/* 2. Primary Navigation Bar Header */}
+          <Navbar onNavigate={handleCustomNavigate} currentRoute={currentRoute} branding={branding} contact={contact} navItems={navItems} />
 
-      {/* 3. Primary View Render Frame */}
-      <div className="flex-grow">
-        {renderRoutePage()}
-      </div>
+          {/* 3. Primary View Render Frame */}
+          <div className="flex-grow">
+            {renderRoutePage()}
+          </div>
 
-      {/* 4. Footer Copy Bar */}
-      <Footer onNavigate={handleCustomNavigate} branding={branding} contact={contact} navItems={navItems} />
+          {/* 4. Footer Copy Bar */}
+          <Footer onNavigate={handleCustomNavigate} branding={branding} contact={contact} navItems={navItems} />
+        </>
+      ) : (
+        /* Admin Isolated View */
+        <div className="flex-grow flex flex-col">
+          {renderRoutePage()}
+        </div>
+      )}
     </div>
   );
 }

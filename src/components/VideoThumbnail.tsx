@@ -111,20 +111,11 @@ export default function VideoThumbnail({
     );
   }
 
-  // 3. Instagram / Facebook / Social Video Card with clean branded poster background
-  const bgPoster = thumbnailUrl || (parsed?.platform === 'instagram' ? 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?q=80&w=800&auto=format&fit=crop' : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=800&auto=format&fit=crop');
-
+  // 3. Instagram / Facebook / Social Video Card without hardcoded stock images
   return (
     <div className={`relative ${aspectClass} overflow-hidden flex flex-col items-center justify-center text-center p-4 select-none group bg-slate-950 ${className}`}>
       
-      {/* Background Image / Poster */}
-      <img
-        src={bgPoster}
-        alt={title}
-        className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500"
-        referrerPolicy="no-referrer"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 pointer-events-none" />
 
       {/* Platform Badge */}
       <span

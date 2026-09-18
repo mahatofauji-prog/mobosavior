@@ -41,6 +41,8 @@ export default function VideoThumbnail({
         <img
           src={officialThumb}
           alt={title}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
           onError={() => setImgFailed(true)}
           className="w-full h-full object-cover opacity-95 group-hover:scale-105 transition-transform duration-500"
           referrerPolicy="no-referrer"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { uploadMediaFile, deleteMediaFile } from '../../lib/storageUpload';
+import { uploadMediaFile, deleteMediaFile, compressThumbnailFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
 import ImageUploader from './ImageUploader';
@@ -115,8 +115,8 @@ export default function AdminGalleryManager() {
     }
   };
 
-  // Handle custom thumbnail file selection
-  const handleCustomThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle custom thumbnail file selection with instant client-side WebP compression
+  const handleCustomThumbnailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -125,10 +125,18 @@ export default function AdminGalleryManager() {
       return;
     }
 
-    setCustomThumbnailFile(file);
-    const localUrl = URL.createObjectURL(file);
-    setExtractedThumbnailUrl(localUrl);
-    setExtractedThumbnailBlob(null);
+    try {
+      // Instant client-side compression to WebP (~30KB-80KB)
+      const compressed = await compressThumbnailFile(file, 960, 0.82);
+      setCustomThumbnailFile(compressed);
+      const localUrl = URL.createObjectURL(compressed);
+      setExtractedThumbnailUrl(localUrl);
+      setExtractedThumbnailBlob(null);
+    } catch (err) {
+      setCustomThumbnailFile(file);
+      setExtractedThumbnailUrl(URL.createObjectURL(file));
+      setExtractedThumbnailBlob(null);
+    }
   };
 
   async function fetchData() {

@@ -70,16 +70,16 @@ export default function AdminGalleryManager() {
   // Auto-extract thumbnail whenever videoUrl changes in 'url' mode
   useEffect(() => {
     if (mediaType === 'video' && videoUploadMode === 'url' && videoUrl.trim()) {
+      // If we are editing an item and the videoUrl hasn't changed or we already have a stored thumbnail, keep it unless custom changed
+      if (editingItem && editingItem.videoUrl === videoUrl.trim() && (editingItem.thumbnailUrl || editingItem.thumbnail_url || editingItem.imageUrl)) {
+        return;
+      }
+
       const parsed = parseVideoUrl(videoUrl);
       if (parsed && parsed.isValid) {
         if (parsed.platform === 'youtube' && parsed.youtubeId) {
           setExtractedThumbnailUrl(`https://img.youtube.com/vi/${parsed.youtubeId}/hqdefault.jpg`);
           setExtractedThumbnailBlob(null);
-          return;
-        }
-
-        if (editingItem && editingItem.videoUrl === videoUrl.trim() && editingItem.thumbnailUrl) {
-          setExtractedThumbnailUrl(editingItem.thumbnailUrl);
           return;
         }
 

@@ -176,7 +176,13 @@ export default function BookingForm({
         last_updated: new Date().toISOString()
       });
 
-      await batch.commit();
+      // Commit with a timeout to prevent hanging if offline
+      await Promise.race([
+        batch.commit(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Network offline or database unreachable. Please check your connection.')), 15000)
+        )
+      ]);
 
       // Also forward booking to WOWSQL if connected
       saveBookingToWowSQL({

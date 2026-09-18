@@ -100,8 +100,12 @@ export async function saveBookingToWowSQL(bookingData: {
   status?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
     const res = await fetch(`${WOWSQL_CONFIG.projectUrl}/rest/v1/service_bookings`, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'apikey': WOWSQL_CONFIG.apiKey,
         'Content-Type': 'application/json',
@@ -112,14 +116,18 @@ export async function saveBookingToWowSQL(bookingData: {
         created_at: new Date().toISOString()
       })
     });
+    
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return { success: false, error: err.message || `HTTP ${res.status}` };
     }
-
     return { success: true };
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return { success: false, error: 'WOWSQL database connection timed out' };
+    }
     return { success: false, error: err.message || 'Network error' };
   }
 }

@@ -111,8 +111,8 @@ export default function VideoThumbnail({
     );
   }
 
-  // 3. Instagram / Facebook / Social Video Card with Thumbnail / Poster support
-  const bgPoster = thumbnailUrl || (parsed?.platform === 'instagram' ? 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=800&auto=format&fit=crop' : 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=800&auto=format&fit=crop');
+  // 3. Instagram / Facebook / Social Video Card with clean branded poster background
+  const bgPoster = thumbnailUrl || (parsed?.platform === 'instagram' ? 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?q=80&w=800&auto=format&fit=crop' : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=800&auto=format&fit=crop');
 
   return (
     <div className={`relative ${aspectClass} overflow-hidden flex flex-col items-center justify-center text-center p-4 select-none group bg-slate-950 ${className}`}>

@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
 import ImageUploader from './ImageUploader';
 import VideoThumbnail from '../VideoThumbnail';
-import { parseVideoUrl, getVideoPlatformLabel, isValidSocialVideoUrl } from '../../lib/videoUtils';
-import { Plus, Edit, Trash2, Eye, Star, Upload, Loader2, Sparkles, Image, Video, CheckCircle, AlertTriangle, ArrowUpDown, X, Play } from 'lucide-react';
-
-
+import { extractFrameFromVideoFile, extractFrameFromVideoUrl, blobToFile } from '../../lib/videoThumbnailExtractor';
+import { parseVideoUrl, getVideoPlatformLabel, isValidSocialVideoUrl, isDirectVideoUrl } from '../../lib/videoUtils';
+import { 
+  Plus, Edit, Trash2, Eye, Star, Upload, Loader2, Sparkles, Image, Video, 
+  CheckCircle, AlertTriangle, ArrowUpDown, X, Play, Film, Camera, RefreshCw, 
+  Sliders, FileVideo, Check
+} from 'lucide-react';
 
 export default function AdminGalleryManager() {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
@@ -43,24 +46,35 @@ export default function AdminGalleryManager() {
   const [active, setActive] = useState(true);
   const [displayOrder, setDisplayOrder] = useState(1);
 
-  // File states for upload to Cloud Storage (photos only)
+  // File states for upload to Cloud Storage
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [beforeFile, setBeforeFile] = useState<File | null>(null);
   const [afterFile, setAfterFile] = useState<File | null>(null);
 
+  // Video specific state
+  const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'file'>('url');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [extractedThumbnailUrl, setExtractedThumbnailUrl] = useState<string | null>(null);
+  const [extractedThumbnailBlob, setExtractedThumbnailBlob] = useState<Blob | null>(null);
+  const [customThumbnailFile, setCustomThumbnailFile] = useState<File | null>(null);
   const [extractingMetadata, setExtractingMetadata] = useState(false);
+  const [frameTimestamp, setFrameTimestamp] = useState<number>(1.0);
+
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Auto-extract thumbnail whenever videoUrl changes in 'url' mode
   useEffect(() => {
-    if (mediaType === 'video' && videoUrl.trim()) {
+    if (mediaType === 'video' && videoUploadMode === 'url' && videoUrl.trim()) {
       const parsed = parseVideoUrl(videoUrl);
       if (parsed && parsed.isValid) {
         if (parsed.platform === 'youtube' && parsed.youtubeId) {
           setExtractedThumbnailUrl(`https://img.youtube.com/vi/${parsed.youtubeId}/hqdefault.jpg`);
+          setExtractedThumbnailBlob(null);
           return;
         }
 
@@ -69,6 +83,24 @@ export default function AdminGalleryManager() {
           return;
         }
 
+        // If direct video link, extract frame directly in browser
+        if (parsed.platform === 'direct' || isDirectVideoUrl(videoUrl)) {
+          setExtractingMetadata(true);
+          extractFrameFromVideoUrl(videoUrl.trim(), frameTimestamp)
+            .then(res => {
+              setExtractedThumbnailUrl(res.dataUrl);
+              setExtractedThumbnailBlob(res.blob);
+            })
+            .catch(err => {
+              console.warn('Direct video frame extraction error:', err);
+            })
+            .finally(() => {
+              setExtractingMetadata(false);
+            });
+          return;
+        }
+
+        // For Instagram / Facebook, query backend metadata
         setExtractingMetadata(true);
         const controller = new AbortController();
         fetch('/api/metadata', {
@@ -81,13 +113,12 @@ export default function AdminGalleryManager() {
           .then(data => {
             if (data.success && data.thumbnailUrl) {
               setExtractedThumbnailUrl(data.thumbnailUrl);
-            } else {
-              setExtractedThumbnailUrl(null);
+              setExtractedThumbnailBlob(null);
             }
           })
           .catch(err => {
             if (err.name !== 'AbortError') {
-              setExtractedThumbnailUrl(null);
+              console.warn('Metadata extraction error:', err);
             }
           })
           .finally(() => {
@@ -95,13 +126,71 @@ export default function AdminGalleryManager() {
           });
 
         return () => controller.abort();
-      } else {
-        setExtractedThumbnailUrl(null);
       }
-    } else {
-      setExtractedThumbnailUrl(null);
     }
-  }, [videoUrl, mediaType]);
+  }, [videoUrl, mediaType, videoUploadMode, frameTimestamp]);
+
+  // Handle direct video file selection
+  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mov|m4v)$/i)) {
+      alert('Please select a valid video file (.mp4, .webm, .mov)');
+      return;
+    }
+
+    setVideoFile(file);
+    setVideoUrl(URL.createObjectURL(file));
+    setExtractingMetadata(true);
+
+    try {
+      const frame = await extractFrameFromVideoFile(file, frameTimestamp);
+      setExtractedThumbnailUrl(frame.dataUrl);
+      setExtractedThumbnailBlob(frame.blob);
+    } catch (err) {
+      console.warn('Frame extraction from video file failed:', err);
+    } finally {
+      setExtractingMetadata(false);
+    }
+  };
+
+  // Re-extract frame at specified seconds
+  const handleExtractAtSeconds = async (seconds: number) => {
+    setFrameTimestamp(seconds);
+    setExtractingMetadata(true);
+    try {
+      if (videoFile) {
+        const frame = await extractFrameFromVideoFile(videoFile, seconds);
+        setExtractedThumbnailUrl(frame.dataUrl);
+        setExtractedThumbnailBlob(frame.blob);
+      } else if (videoUrl && (isDirectVideoUrl(videoUrl) || videoUrl.startsWith('blob:'))) {
+        const frame = await extractFrameFromVideoUrl(videoUrl, seconds);
+        setExtractedThumbnailUrl(frame.dataUrl);
+        setExtractedThumbnailBlob(frame.blob);
+      }
+    } catch (e) {
+      console.warn('Could not extract frame at', seconds, e);
+    } finally {
+      setExtractingMetadata(false);
+    }
+  };
+
+  // Handle custom thumbnail file selection
+  const handleCustomThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (JPG, PNG, WebP)');
+      return;
+    }
+
+    setCustomThumbnailFile(file);
+    const localUrl = URL.createObjectURL(file);
+    setExtractedThumbnailUrl(localUrl);
+    setExtractedThumbnailBlob(null);
+  };
 
   async function fetchData() {
     try {
@@ -155,7 +244,12 @@ export default function AdminGalleryManager() {
     setImageFile(null);
     setBeforeFile(null);
     setAfterFile(null);
+    setVideoFile(null);
+    setVideoUploadMode('url');
     setExtractedThumbnailUrl(null);
+    setExtractedThumbnailBlob(null);
+    setCustomThumbnailFile(null);
+    setFrameTimestamp(1.0);
     setModalOpen(true);
   };
 
@@ -178,7 +272,12 @@ export default function AdminGalleryManager() {
     setImageFile(null);
     setBeforeFile(null);
     setAfterFile(null);
+    setVideoFile(null);
+    setVideoUploadMode('url');
     setExtractedThumbnailUrl(item.thumbnailUrl || null);
+    setExtractedThumbnailBlob(null);
+    setCustomThumbnailFile(null);
+    setFrameTimestamp(1.0);
     setModalOpen(true);
   };
 
@@ -204,7 +303,7 @@ export default function AdminGalleryManager() {
       let finalBeforeUrl = beforeImageUrl;
       let finalAfterUrl = afterImageUrl;
 
-      // 1. Handle file uploads if selected (images only)
+      // 1. Handle image file uploads if selected
       if (imageFile) {
         finalImageUrl = await uploadFileToStorage(imageFile, 'photos');
       }
@@ -221,18 +320,47 @@ export default function AdminGalleryManager() {
       let youtubeVideoId: string | null = null;
       let officialThumbnailUrl: string | null = null;
 
-      // 2. Validate Social Media Video URL for "video" mediaType
+      // 2. Handle Video File / URL & Extracted Thumbnail for "video" mediaType
       if (mediaType === 'video') {
-        parsedVideo = parseVideoUrl(videoUrl);
-        if (!parsedVideo || !parsedVideo.isValid) {
-          alert('Please enter a valid YouTube, Facebook or Instagram video URL.');
+        if (videoUploadMode === 'file' && videoFile) {
+          // Upload local video file to storage
+          finalVideoUrl = await uploadFileToStorage(videoFile, 'videos');
+          videoPlatform = 'direct';
+        } else if (videoUrl.trim()) {
+          parsedVideo = parseVideoUrl(videoUrl);
+          if (!parsedVideo || !parsedVideo.isValid) {
+            alert('Please enter a valid YouTube, Facebook, Instagram, or direct video URL.');
+            setUploadLoading(false);
+            return;
+          }
+          finalVideoUrl = parsedVideo.originalUrl;
+          videoPlatform = parsedVideo.platform;
+          youtubeVideoId = parsedVideo.youtubeId || null;
+        } else {
+          alert('Please provide a video file or video URL.');
           setUploadLoading(false);
           return;
         }
-        finalVideoUrl = parsedVideo.originalUrl;
-        videoPlatform = parsedVideo.platform;
-        youtubeVideoId = parsedVideo.youtubeId || null;
-        officialThumbnailUrl = extractedThumbnailUrl;
+
+        // Upload custom thumbnail file or extracted canvas frame blob
+        if (customThumbnailFile) {
+          officialThumbnailUrl = await uploadFileToStorage(customThumbnailFile, 'thumbnails');
+        } else if (extractedThumbnailBlob) {
+          const thumbFile = blobToFile(extractedThumbnailBlob, `thumb_${Date.now()}.jpg`);
+          officialThumbnailUrl = await uploadFileToStorage(thumbFile, 'thumbnails');
+        } else if (extractedThumbnailUrl && extractedThumbnailUrl.startsWith('data:')) {
+          try {
+            const blobRes = await fetch(extractedThumbnailUrl);
+            const blobData = await blobRes.blob();
+            const thumbFile = blobToFile(blobData, `thumb_${Date.now()}.jpg`);
+            officialThumbnailUrl = await uploadFileToStorage(thumbFile, 'thumbnails');
+          } catch (e) {
+            console.warn('Failed to upload dataURL thumbnail:', e);
+            officialThumbnailUrl = extractedThumbnailUrl;
+          }
+        } else {
+          officialThumbnailUrl = extractedThumbnailUrl;
+        }
       }
 
       const itemId = editingItem ? editingItem.id : `gal-${Date.now()}`;
@@ -248,10 +376,13 @@ export default function AdminGalleryManager() {
         imageUrl: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
         image_url: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
         thumbnailUrl: mediaType === 'video' ? officialThumbnailUrl : null,
+        thumbnail_url: mediaType === 'video' ? officialThumbnailUrl : null,
         videoUrl: finalVideoUrl || null,
         video_url: finalVideoUrl || null,
         videoPlatform: videoPlatform || null,
+        video_platform: videoPlatform || null,
         youtubeVideoId: youtubeVideoId || null,
+        youtube_video_id: youtubeVideoId || null,
         beforeImageUrl: finalBeforeUrl || null,
         afterImageUrl: finalAfterUrl || null,
         altText: [brand, model, title].filter(Boolean).join(' - ') || null,
@@ -308,6 +439,8 @@ export default function AdminGalleryManager() {
           videoPlatform: videoPlatform || null,
           thumbnailUrl: officialThumbnailUrl,
           thumbnail_url: officialThumbnailUrl,
+          imageUrl: officialThumbnailUrl,
+          image_url: officialThumbnailUrl,
           featured: !!featured,
           active: active !== false,
           is_active: active !== false,
@@ -664,76 +797,190 @@ export default function AdminGalleryManager() {
                 </div>
               </div>
 
-              {/* Repair Video specific field layout: Video URL * -> Category * */}
+              {/* Repair Video specific field layout */}
               {mediaType === 'video' ? (
                 <>
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+                    {/* Mode Selector */}
                     <div>
-                      <label className="block text-slate-700 font-bold mb-1">Video URL *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Paste YouTube, Facebook or Instagram URL"
-                        value={videoUrl}
-                        onChange={(e) => setVideoUrl(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7]/20 focus:border-[#0284C7]"
-                      />
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supported Sources:</span>
-                        <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded-md border border-red-200">
-                          YouTube (Video / Shorts)
-                        </span>
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200">
-                          Facebook (Video / Reel)
-                        </span>
-                        <span className="px-2 py-0.5 bg-pink-50 text-pink-700 text-[10px] font-bold rounded-md border border-pink-200">
-                          Instagram (Reel / Post)
-                        </span>
+                      <label className="block text-slate-700 font-bold mb-1.5">Video Source *</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVideoUploadMode('url');
+                            setVideoFile(null);
+                          }}
+                          className={`py-2 px-3 rounded-xl font-extrabold text-xs border flex items-center justify-center gap-1.5 ${
+                            videoUploadMode === 'url'
+                              ? 'bg-[#0284C7] text-white border-[#0284C7]'
+                              : 'bg-white text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <Film className="w-3.5 h-3.5" />
+                          Video Link (YouTube / Social / URL)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVideoUploadMode('file');
+                            setVideoUrl('');
+                          }}
+                          className={`py-2 px-3 rounded-xl font-extrabold text-xs border flex items-center justify-center gap-1.5 ${
+                            videoUploadMode === 'file'
+                              ? 'bg-[#0284C7] text-white border-[#0284C7]'
+                              : 'bg-white text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Upload Video File (MP4/WebM)
+                        </button>
                       </div>
                     </div>
 
-                    {/* Real-time Video Preview & Validation */}
-                    {videoUrl.trim() && (
-                      (() => {
-                        const parsed = parseVideoUrl(videoUrl);
-                        if (parsed && parsed.isValid) {
-                          return (
-                            <div className="space-y-2 p-3 bg-white rounded-2xl border border-emerald-200 shadow-sm">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5 text-[11px]">
-                                  <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                  Valid {getVideoPlatformLabel(parsed.platform)} Video Detected
-                                </span>
-                              </div>
-                              <VideoThumbnail
-                                videoUrl={parsed.originalUrl}
-                                thumbnailUrl={extractedThumbnailUrl}
-                                aspectRatio="video"
-                                title="Platform Preview"
-                                showPlayButton={false}
-                                className="rounded-xl overflow-hidden"
-                              />
-                              <p className="text-[11px] text-slate-500 italic">
-                                {extractingMetadata ? (
-                                  <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Extracting thumbnail...</span>
-                                ) : extractedThumbnailUrl ? (
-                                  'Actual thumbnail successfully extracted.'
-                                ) : (
-                                  'Thumbnail extraction unavailable. Video will play directly via the official platform embed.'
-                                )}
-                              </p>
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-600 font-bold flex items-center gap-2">
-                              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                              <span>Please enter a valid YouTube, Facebook or Instagram video URL.</span>
-                            </div>
-                          );
-                        }
-                      })()
+                    {videoUploadMode === 'url' ? (
+                      <div>
+                        <label className="block text-slate-700 font-bold mb-1">Video URL *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Paste YouTube, Facebook, Instagram, or direct video URL"
+                          value={videoUrl}
+                          onChange={(e) => setVideoUrl(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-[#0284C7]/20 focus:border-[#0284C7]"
+                        />
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Supported Sources:</span>
+                          <span className="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded-md border border-red-200">
+                            YouTube
+                          </span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200">
+                            Facebook
+                          </span>
+                          <span className="px-2 py-0.5 bg-pink-50 text-pink-700 text-[10px] font-bold rounded-md border border-pink-200">
+                            Instagram
+                          </span>
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200">
+                            Direct MP4 / WebM
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-slate-700 font-bold mb-1">Upload Video File (.mp4, .webm, .mov) *</label>
+                        <input
+                          ref={videoFileInputRef}
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime,video/*"
+                          onChange={handleVideoFileChange}
+                          className="hidden"
+                        />
+                        <div
+                          onClick={() => videoFileInputRef.current?.click()}
+                          className="border-2 border-dashed border-sky-300 hover:border-sky-500 bg-sky-50/50 hover:bg-sky-50 rounded-2xl p-6 text-center cursor-pointer transition-colors"
+                        >
+                          <FileVideo className="w-8 h-8 text-sky-500 mx-auto mb-2" />
+                          <p className="text-xs font-bold text-slate-800">
+                            {videoFile ? videoFile.name : 'Click or Drag & Drop Video File to Upload'}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            {videoFile ? `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB • Ready for auto thumbnail extraction` : 'Supported: MP4, WebM, MOV (Auto frame extraction)'}
+                          </p>
+                        </div>
+                      </div>
                     )}
+
+                    {/* Thumbnail & Frame Extraction Box */}
+                    <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <Camera className="w-4 h-4 text-sky-500" />
+                          Video Poster & Thumbnail
+                        </span>
+                        {extractingMetadata && (
+                          <span className="text-[10px] font-bold text-sky-600 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Processing frame...
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Video Thumbnail Preview */}
+                      {(videoUrl.trim() || videoFile) && (
+                        <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-200 aspect-video max-h-48 flex items-center justify-center">
+                          {extractedThumbnailUrl ? (
+                            <img
+                              src={extractedThumbnailUrl}
+                              alt="Extracted Thumbnail"
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : videoFile || (videoUrl && isDirectVideoUrl(videoUrl)) ? (
+                            <video
+                              src={videoUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                              playsInline
+                            />
+                          ) : (
+                            <VideoThumbnail
+                              videoUrl={videoUrl}
+                              thumbnailUrl={extractedThumbnailUrl}
+                              aspectRatio="video"
+                              title="Video Preview"
+                              showPlayButton={false}
+                              className="w-full h-full"
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Frame extraction timestamps for direct video or uploaded video */}
+                      {(videoFile || (videoUrl && (isDirectVideoUrl(videoUrl) || videoUrl.startsWith('blob:')))) && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                            <Sliders className="w-3 h-3" /> Capture frame at:
+                          </span>
+                          {[0.5, 1.0, 2.5, 5.0, 10.0].map((sec) => (
+                            <button
+                              key={sec}
+                              type="button"
+                              onClick={() => handleExtractAtSeconds(sec)}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+                                frameTimestamp === sec
+                                  ? 'bg-sky-600 text-white border-sky-600'
+                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {sec}s
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Custom Thumbnail Upload Option */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <input
+                          ref={thumbnailInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCustomThumbnailChange}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => thumbnailInputRef.current?.click()}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-xl flex items-center gap-1.5 transition-colors"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-sky-500" />
+                          {customThumbnailFile ? `Replace: ${customThumbnailFile.name}` : 'Upload Custom Cover / Thumbnail'}
+                        </button>
+                        {extractedThumbnailUrl && (
+                          <span className="text-[10px] font-extrabold text-emerald-600 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" /> Thumbnail Ready
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Category */}

@@ -14,7 +14,8 @@ export default function EmbeddedVideoPlayer({
   videoUrl,
   title = 'Repair Video',
   thumbnailUrl,
-  className = 'w-full h-full'
+  className = 'w-full h-full',
+  autoPlay = false
 }: EmbeddedVideoPlayerProps) {
   const [embedError, setEmbedError] = useState(false);
   const parsed = parseVideoUrl(videoUrl);
@@ -44,7 +45,26 @@ export default function EmbeddedVideoPlayer({
     );
   }
 
-  // 1. YouTube Player
+  // 1. Direct HTML5 Video Player
+  if (parsed.platform === 'direct' || videoUrl.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i) || videoUrl.startsWith('blob:') || videoUrl.includes('/storage/')) {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+        <video
+          src={videoUrl}
+          controls
+          autoPlay={autoPlay}
+          poster={thumbnailUrl || undefined}
+          playsInline
+          className="w-full h-full object-contain max-h-[80vh]"
+          onError={() => setEmbedError(true)}
+        >
+          Your browser does not support HTML5 video playback.
+        </video>
+      </div>
+    );
+  }
+
+  // 2. YouTube Player
   if (parsed.platform === 'youtube') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
@@ -60,7 +80,7 @@ export default function EmbeddedVideoPlayer({
     );
   }
 
-  // 2. Facebook Player
+  // 3. Facebook Player
   if (parsed.platform === 'facebook') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
@@ -78,10 +98,10 @@ export default function EmbeddedVideoPlayer({
     );
   }
 
-  // 3. Instagram Player
+  // 4. Instagram Player
   if (parsed.platform === 'instagram') {
     return (
-      <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center p-2 sm:p-4 ${className}`}>
+      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center p-2 sm:p-4 ${className}`}>
         <iframe
           src={parsed.embedUrl}
           title={title}
@@ -95,5 +115,16 @@ export default function EmbeddedVideoPlayer({
     );
   }
 
-  return null;
+  return (
+    <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+      <video
+        src={videoUrl}
+        controls
+        autoPlay={autoPlay}
+        poster={thumbnailUrl || undefined}
+        playsInline
+        className="w-full h-full object-contain max-h-[80vh]"
+      />
+    </div>
+  );
 }

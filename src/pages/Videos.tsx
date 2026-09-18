@@ -55,7 +55,11 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
           videosRes.value.forEach((docSnap) => {
             const data = docSnap.data();
             if (data.active !== false && data.videoUrl) {
-              fetched.push({ id: docSnap.id, ...data } as VideoItem);
+              fetched.push({
+                id: docSnap.id,
+                thumbnailUrl: data.thumbnailUrl || data.imageUrl || null,
+                ...data
+              } as VideoItem);
             }
           });
         }
@@ -68,6 +72,7 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
                 fetched.push({
                   id: docSnap.id,
                   videoUrl: data.videoUrl,
+                  thumbnailUrl: data.thumbnailUrl || data.imageUrl || null,
                   title: data.title || 'Repair Video',
                   description: data.description || '',
                   category: getCategoryLabel(data.category),

@@ -316,15 +316,19 @@ export async function uploadMediaFile(
     };
   };
 
-  // Try Supabase Storage first if bucket is available
+  // Try Supabase Storage first if bucket is available (with 3-second timeout)
   try {
     const sPath = generateStoragePath(processedFile, folder);
-    const { data: sData, error: sErr } = await supabase.storage
+    const storagePromise = supabase.storage
       .from('mobosavior-media')
       .upload(sPath, processedFile, {
         cacheControl: '3600',
         upsert: true
       });
+    const timeoutPromise = new Promise<{ data: null; error: any }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('Supabase storage timeout') }), 3000)
+    );
+    const { data: sData, error: sErr } = await Promise.race([storagePromise, timeoutPromise]);
     if (!sErr && sData) {
       const { data: urlData } = supabase.storage
         .from('mobosavior-media')
@@ -346,9 +350,10 @@ export async function uploadMediaFile(
 
   const uniquePath = generateStoragePath(processedFile, folder);
 
-  // Native App Server Upload (/api/upload) with real XHR Progress
+  // Native App Server Upload (/api/upload) with 2.5s timeout and real XHR Progress
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
+    xhr.timeout = 2500;
     const formData = new FormData();
     formData.append('folder', folder);
     formData.append('path', uniquePath);
@@ -359,6 +364,24 @@ export async function uploadMediaFile(
         const percent = Math.round((event.loaded / event.total) * 100);
         onProgress(Math.min(percent, 100));
       }
+    };
+
+    xhr.ontimeout = async () => {
+      if (isImage) {
+        const fallback = await getFallbackResult();
+        if (fallback.success) {
+          resolve(fallback);
+          return;
+        }
+      }
+      resolve({
+        success: false,
+        url: '',
+        filename: file.name,
+        size: file.size,
+        mimeType: file.type,
+        error: 'Upload timed out. Falling back to local data.'
+      });
     };
 
     xhr.onload = async () => {

@@ -316,7 +316,7 @@ export async function uploadMediaFile(
     };
   };
 
-  // Try Supabase Storage first if bucket is available (with 3-second timeout)
+  // Try Supabase Storage first if bucket is available (with 5-second timeout)
   try {
     const sPath = generateStoragePath(processedFile, folder);
     const storagePromise = supabase.storage
@@ -324,12 +324,13 @@ export async function uploadMediaFile(
       .upload(sPath, processedFile, {
         cacheControl: '3600',
         upsert: true
-      });
+      })
+      .catch((err) => ({ data: null, error: err }));
     const timeoutPromise = new Promise<{ data: null; error: any }>((resolve) =>
-      setTimeout(() => resolve({ data: null, error: new Error('Supabase storage timeout') }), 3000)
+      setTimeout(() => resolve({ data: null, error: new Error('Supabase storage timeout') }), 5000)
     );
-    const { data: sData, error: sErr } = await Promise.race([storagePromise, timeoutPromise]);
-    if (!sErr && sData) {
+    const res: any = await Promise.race([storagePromise, timeoutPromise]);
+    if (res && !res.error && res.data) {
       const { data: urlData } = supabase.storage
         .from('mobosavior-media')
         .getPublicUrl(sPath);
@@ -350,10 +351,10 @@ export async function uploadMediaFile(
 
   const uniquePath = generateStoragePath(processedFile, folder);
 
-  // Native App Server Upload (/api/upload) with 2.5s timeout and real XHR Progress
+  // Native App Server Upload (/api/upload) with 60s timeout and real XHR Progress
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.timeout = 2500;
+    xhr.timeout = 60000;
     const formData = new FormData();
     formData.append('folder', folder);
     formData.append('path', uniquePath);

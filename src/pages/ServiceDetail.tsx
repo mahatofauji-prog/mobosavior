@@ -5,8 +5,8 @@ import {
   HelpCircle, Activity, Award, Check, Wrench, Smartphone, FileText, AlertTriangle, 
   PlayCircle, ArrowRight, Layers, PhoneCall, MapPin, Sparkles, ChevronRight, Tag, DollarSign
 } from 'lucide-react';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, orderBy, query } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { getServiceImage } from '../utils/serviceImages';
 import { ALL_COMPREHENSIVE_SERVICES } from '../data/servicesData';
 import { DEFAULT_BRANDS, DEFAULT_MODELS } from '../data/modelsData';

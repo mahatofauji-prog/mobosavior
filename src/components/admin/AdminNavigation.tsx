@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { NavigationItem } from '../../types';
 import { Plus, Edit, Trash2, Save, X, Layers, Loader2, GripVertical, Check } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../firebase/errors';
+import { handleFirestoreError, OperationType } from '../../lib/errors';
 import ImageUploader from './ImageUploader';
 
 export default function AdminNavigation() {

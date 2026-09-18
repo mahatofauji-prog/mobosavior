@@ -1,9 +1,9 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { TrustPoint } from '../../types';
 import { renderTrustIcon, POPULAR_TRUST_ICONS } from '../../utils/offerHelpers';
-import { DEFAULT_TRUST_POINTS } from '../../firebase/seed';
+import { DEFAULT_TRUST_POINTS } from '../../lib/seed';
 import ImageUploader from './ImageUploader';
 import { 
   Shield, 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { GalleryItem, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../types';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';

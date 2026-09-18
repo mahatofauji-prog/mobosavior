@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, doc, getDoc, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { TrustPoint, ContactSettings } from '../types';
 import { renderTrustIcon } from '../utils/offerHelpers';
-import { DEFAULT_TRUST_POINTS } from '../firebase/seed';
+import { DEFAULT_TRUST_POINTS } from '../lib/seed';
 import { motion } from 'motion/react';
 import { 
   CheckCircle2, 
@@ -144,7 +144,6 @@ export default function HomeTrustSection({ onNavigate, contact: propContact }: H
     fetchData();
   }, [propContact]);
 
-  // Fallback to static numbers if not available in prop or firebase
   const cleanWhatsapp = (contact?.whatsapp || '081675 49092').replace(/\D/g, '');
   const cleanPhone = (contact?.phone || '081675 49092').replace(/\D/g, '');
 

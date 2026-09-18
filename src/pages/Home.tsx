@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { Service, Review, FAQItem, WebsiteContent, ContactSettings, SlideItem, GalleryItem, VideoItem, ServiceCategory, Branch, WebsiteSection } from '../types';
 import { isSectionVisible } from '../utils/sectionSettings';
 import { Smartphone, Wrench, Cpu, ShieldCheck, ArrowRight, MessageSquare, MapPin, Star, Calendar, Sparkles, Navigation, Clock, ShieldAlert, Eye, X, Play, Camera, Video, Loader2, TabletSmartphone, Terminal, Layers, CheckCircle2, Zap, ChevronDown, Facebook, Instagram } from 'lucide-react';

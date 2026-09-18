@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, orderBy, writeBatch } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { LegalPage, LegalSection } from '../../types';
 import { FileText, Save, Plus, Edit, Trash2, GripVertical, Check, X, Shield, RefreshCw } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../firebase/errors';
+import { handleFirestoreError, OperationType } from '../../lib/errors';
 import { DEFAULT_TERMS_PAGE, DEFAULT_TERMS_SECTIONS, DEFAULT_PRIVACY_PAGE, DEFAULT_PRIVACY_SECTIONS } from '../../data/defaultLegalData';
 
 // A simple toolbar component that wraps selected text in a textarea

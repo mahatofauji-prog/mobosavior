@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  collection, 
+import { collection, 
   getDocs, 
   doc, 
   setDoc, 
   deleteDoc, 
   updateDoc, 
   query, 
-  orderBy 
-} from 'firebase/firestore';
-import { db } from '../../firebase/config';
+  orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { ServiceCategory, Service } from '../../types';
 import { DEFAULT_CATEGORIES } from '../../data/modelsData';
 import ImageUploader from './ImageUploader';

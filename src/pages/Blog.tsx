@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BlogPost, BlogCategory, ContactSettings } from '../types';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/errors';
+import { collection, query, where, getDocs, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
+import { handleFirestoreError, OperationType } from '../lib/errors';
 import { Search, Calendar, User, ArrowRight, Loader2, Sparkles, Filter, ChevronRight } from 'lucide-react';
 import SEOHead from '../components/SEOHead';
 

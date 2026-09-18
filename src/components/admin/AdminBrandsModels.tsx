@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { Brand, PhoneModel, ServiceCategory, Service } from '../../types';
 import { DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_CATEGORIES } from '../../data/modelsData';
 import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';

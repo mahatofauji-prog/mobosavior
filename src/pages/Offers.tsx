@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { Offer, OfferCategory, ContactSettings } from '../types';
 import { getOfferStatus, OfferStatus } from '../utils/offerHelpers';
-import { DEFAULT_OFFERS, DEFAULT_OFFER_CATEGORIES } from '../firebase/seed';
+import { DEFAULT_OFFERS, DEFAULT_OFFER_CATEGORIES } from '../lib/seed';
 import SEOHead from '../components/SEOHead';
 import { Tag, Sparkles, Clock, MessageSquare, Calendar, PhoneCall, ChevronDown, ChevronUp, AlertCircle, Gift, CheckCircle2, ShieldCheck, Wrench, ArrowRight } from 'lucide-react';
 

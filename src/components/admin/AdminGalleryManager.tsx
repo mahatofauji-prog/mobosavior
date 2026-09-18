@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
@@ -44,7 +44,7 @@ export default function AdminGalleryManager() {
   const [active, setActive] = useState(true);
   const [displayOrder, setDisplayOrder] = useState(1);
 
-  // File states for upload to Firebase Storage (photos only)
+  // File states for upload to Cloud Storage (photos only)
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [beforeFile, setBeforeFile] = useState<File | null>(null);
   const [afterFile, setAfterFile] = useState<File | null>(null);

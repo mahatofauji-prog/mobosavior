@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, where } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { GalleryItem } from '../types';
 import BeforeAfterSlider from './BeforeAfterSlider';
 import VideoThumbnail from './VideoThumbnail';

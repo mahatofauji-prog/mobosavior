@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { Offer, ContactSettings } from '../types';
 import { getOfferStatus } from '../utils/offerHelpers';
-import { DEFAULT_OFFERS } from '../firebase/seed';
+import { DEFAULT_OFFERS } from '../lib/seed';
 import { Tag, Sparkles, ArrowRight, MessageSquare, Calendar, PhoneCall, Gift, Clock } from 'lucide-react';
 
 interface HomeOffersSectionProps {

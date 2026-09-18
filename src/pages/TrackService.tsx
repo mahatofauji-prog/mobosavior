@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Loader2, FileText, CheckCircle2, Clock, AlertTriangle, Smartphone, Hammer, Truck } from 'lucide-react';
-import { db } from '../firebase/config';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/supabase';
+import { doc, onSnapshot } from '../lib/supabase';
 
 interface TrackServiceProps {
   onNavigate: (route: string) => void;

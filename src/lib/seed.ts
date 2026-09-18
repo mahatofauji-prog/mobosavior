@@ -1,5 +1,5 @@
-import { doc, getDoc, setDoc, updateDoc, writeBatch, collection, getDocs, limit, query } from 'firebase/firestore';
-import { db } from './config';
+import { doc, getDoc, setDoc, updateDoc, writeBatch, collection, getDocs, limit, query } from '../lib/supabase';
+import { db } from './supabase';
 import { Service, FAQItem, Review, WebsiteContent, ContactSettings, BrandingSettings, SEOSettings, SlideItem, TrustPoint, OfferCategory, Offer, Branch } from '../types';
 import { ALL_COMPREHENSIVE_SERVICES } from '../data/servicesData';
 import { DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_CATEGORIES } from '../data/modelsData';

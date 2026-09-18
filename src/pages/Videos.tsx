@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { VideoItem, getCategoryLabel } from '../types';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import VideoThumbnail from '../components/VideoThumbnail';

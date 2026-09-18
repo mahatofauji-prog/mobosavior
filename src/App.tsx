@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-// Firebase auth is bypassed for local admin passcode gate
-import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { auth, db } from './firebase/config';
-import { handleFirestoreError, OperationType } from './firebase/errors';
+import { doc, getDoc, collection, getDocs, query, orderBy } from './lib/supabase';
+import { auth, db } from './lib/supabase';
+import { handleFirestoreError, OperationType } from './lib/errors';
 import { 
   Service, Review, FAQItem, BrandingSettings, ContactSettings, WebsiteContent, SEOSettings, SlideItem, Brand, PhoneModel, PriceItem, Branch, WebsiteSection,
   BusinessHours, ServiceCategory, NavigationItem 
@@ -39,7 +38,7 @@ import BranchDetail from './pages/BranchDetail';
 
 
 // Fallback seeds in case database is loading
-import { DEFAULT_SERVICES, DEFAULT_FAQS, DEFAULT_REVIEWS, DEFAULT_SLIDES, DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_BRANCHES, seedDatabaseIfEmpty } from './firebase/seed';
+import { DEFAULT_SERVICES, DEFAULT_FAQS, DEFAULT_REVIEWS, DEFAULT_SLIDES, DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_BRANCHES, seedDatabaseIfEmpty } from './lib/seed';
 import { getServiceImage } from './utils/serviceImages';
 import { Sparkles, Loader2 } from 'lucide-react';
 

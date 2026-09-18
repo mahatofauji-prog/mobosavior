@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, query, orderBy, limit } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { uploadMediaFile, validateImageFile, validateMediaFile } from '../../lib/storageUpload';
 import { 
   Upload, Link as LinkIcon, Image as ImageIcon, X, Check, Loader2, 
@@ -303,7 +303,7 @@ export default function ImageUploader({
             {/* Overlaid Source Badge */}
             <div className="absolute top-2 left-2 bg-slate-900/90 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-md backdrop-blur border border-slate-700 flex items-center gap-1.5 shadow-md">
               <ImageIcon className="w-3 h-3 text-sky-400" />
-              <span>{value.startsWith('/uploads/') ? 'Local Storage' : value.includes('firebasestorage') ? 'Firebase Storage' : 'Image URL'}</span>
+              <span>{value.startsWith('/uploads/') ? 'Local Storage' : value.includes('supabase.co/storage') ? 'Cloud Storage' : 'Image URL'}</span>
             </div>
           </div>
 

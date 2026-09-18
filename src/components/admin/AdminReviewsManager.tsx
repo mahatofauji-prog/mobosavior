@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { Review, GoogleReviewsSettings } from '../../types';
 import ImageUploader from './ImageUploader';

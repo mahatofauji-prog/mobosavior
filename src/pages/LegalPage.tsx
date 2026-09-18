@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, query, where, getDocs, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { LegalPage as LegalPageType, LegalSection } from '../types';
 import { Shield, FileText, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';

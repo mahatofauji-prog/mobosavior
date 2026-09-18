@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BlogPost, ContactSettings } from '../types';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/errors';
+import { collection, query, where, getDocs, limit } from '../lib/supabase';
+import { db } from '../lib/supabase';
+import { handleFirestoreError, OperationType } from '../lib/errors';
 import { ChevronLeft, Calendar, User, Tag, Loader2, Sparkles, MessageSquare, PhoneCall, Share2 } from 'lucide-react';
 import SEOHead from '../components/SEOHead';
 import { trackWhatsAppClick } from '../lib/analytics';

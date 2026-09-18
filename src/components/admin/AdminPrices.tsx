@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { PriceItem, PriceType, Service, Brand, PhoneModel } from '../../types';
 import { getFormattedPriceString, formatAmount } from '../../utils/priceHelpers';
 import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';

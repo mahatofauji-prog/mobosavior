@@ -1,8 +1,8 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { Branch, Service, WeeklyBusinessHours, DayBusinessHours } from '../../types';
-import { DEFAULT_BRANCHES } from '../../firebase/seed';
+import { DEFAULT_BRANCHES } from '../../lib/seed';
 import { isOpenNow } from '../../utils/branchHelpers';
 import ImageUploader from './ImageUploader';
 import { 

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, where, limit } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { Review, GoogleReviewsSettings } from '../types';
 import { Star, MessageSquareQuote, ArrowRight, ShieldCheck } from 'lucide-react';
-import { DEFAULT_REVIEWS } from '../firebase/seed';
+import { DEFAULT_REVIEWS } from '../lib/seed';
 
 interface HomeReviewsSectionProps {
   onNavigate: (route: string) => void;

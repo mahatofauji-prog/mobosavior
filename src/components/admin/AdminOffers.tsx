@@ -1,9 +1,9 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { Offer, OfferCategory, OfferCTAType } from '../../types';
 import { getOfferStatus } from '../../utils/offerHelpers';
-import { DEFAULT_OFFERS, DEFAULT_OFFER_CATEGORIES } from '../../firebase/seed';
+import { DEFAULT_OFFERS, DEFAULT_OFFER_CATEGORIES } from '../../lib/seed';
 import ImageUploader from './ImageUploader';
 import { Plus, Edit2, Trash2, Tag, Calendar, Sparkles, Check, X, Eye, EyeOff, Layers, FolderPlus, MessageSquare, ArrowUpRight, Search } from 'lucide-react';
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { signOut } from 'firebase/auth';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
+import { signOut } from '../lib/supabase';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../lib/supabase';
+import { auth, db } from '../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../lib/storageUpload';
 import { 
   Booking, Service, FAQItem, Review, GalleryItem, VideoItem, 
@@ -343,7 +343,7 @@ export default function AdminDashboard({
     if (confirm('Are you sure you want to permanently delete this video?')) {
       try {
         await deleteDoc(doc(db, 'videos', id));
-        if (videoUrl && (videoUrl.includes('firebasestorage') || videoUrl.includes('appspot.com'))) {
+        if (videoUrl && (videoUrl.includes('supabase.co/storage') || videoUrl.includes('appspot.com'))) {
           await deleteMediaFile(videoUrl);
         }
         fetchMedia();
@@ -2453,7 +2453,7 @@ export default function AdminDashboard({
 
             <form onSubmit={handleSaveGalleryItem} className="space-y-4">
               <div>
-                <label className="block text-slate-500 mb-1">Upload Photo File (Firebase Storage) *</label>
+                <label className="block text-slate-500 mb-1">Upload Photo File (Cloud Storage) *</label>
                 <input
                   type="file"
                   name="imageFile"

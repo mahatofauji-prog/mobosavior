@@ -4,8 +4,8 @@ import {
   FileText, Search, Loader2, Edit3, CheckCircle2, Clock, 
   AlertTriangle, Hammer, Smartphone, Truck, ExternalLink, Download, X 
 } from 'lucide-react';
-import { db } from '../../firebase/config';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { db } from '../../lib/supabase';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch } from '../../lib/supabase';
 import { ServiceBooking } from '../../types';
 
 export default function AdminServiceBookings() {

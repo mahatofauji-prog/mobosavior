@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, getDocs, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { FAQItem } from '../types';
 import { HelpCircle, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { DEFAULT_FAQS } from '../firebase/seed';
+import { DEFAULT_FAQS } from '../lib/seed';
 
 export default function FAQ() {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);

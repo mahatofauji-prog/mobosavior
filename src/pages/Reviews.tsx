@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { collection, addDoc, getDocs, doc, getDoc, query, orderBy } from '../lib/supabase';
+import { db } from '../lib/supabase';
 import { Review, GoogleReviewsSettings } from '../types';
 import { Star, Send, Calendar, CheckCircle, AlertTriangle, ShieldCheck, Filter, Upload, Sparkles, MessageSquareQuote } from 'lucide-react';
-import { DEFAULT_REVIEWS } from '../firebase/seed';
+import { DEFAULT_REVIEWS } from '../lib/seed';
 
 export default function Reviews() {
   const [reviewsList, setReviewsList] = useState<Review[]>([]);

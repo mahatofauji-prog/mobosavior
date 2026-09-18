@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../../lib/storageUpload';
 import { MediaItem } from '../../types';
 import { Plus, Trash2, Loader2, Image as ImageIcon, Copy, Check, UploadCloud, Search } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../firebase/errors';
+import { handleFirestoreError, OperationType } from '../../lib/errors';
 
 export default function AdminMediaLibrary() {
   const [items, setItems] = useState<MediaItem[]>([]);

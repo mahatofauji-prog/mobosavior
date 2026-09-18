@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { Page, PageSection } from '../../types';
 import { 
   Plus, Edit, Trash2, Save, X, Eye, FileText, MoveUp, MoveDown, HelpCircle, 
   Settings, Globe, Loader2, Sparkles, Image as ImageIcon, Video, ToggleLeft, Layers 
 } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../firebase/errors';
+import { handleFirestoreError, OperationType } from '../../lib/errors';
 import ImageUploader from './ImageUploader';
 
 interface AdminPagesProps {

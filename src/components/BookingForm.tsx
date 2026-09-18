@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Upload, X, CheckCircle2, ArrowRight, Loader2, Camera, Smartphone
 } from 'lucide-react';
-import { db } from '../firebase/config';
-import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { saveBookingToWowSQL } from '../lib/wowsql';
+import { db } from '../lib/supabase';
+import { collection, doc, writeBatch, serverTimestamp } from '../lib/supabase';
 import { uploadMediaFile } from '../lib/storageUpload';
 import { Brand, PhoneModel, Service, Branch } from '../types';
 
@@ -185,17 +184,6 @@ export default function BookingForm({
       ]);
 
       // Also forward booking to WOWSQL if connected
-      saveBookingToWowSQL({
-        customer_name: customerName,
-        customer_phone: contactNumber,
-        device_brand: mobileBrand,
-        device_model: mobileModel,
-        issue_description: problem,
-        preferred_date: preferredDate,
-        status: 'Booking Received'
-      }).catch((err) => {
-        console.warn('WOWSQL sync warning (will succeed once table is created):', err);
-      });
 
       // Clean up previews
       if (frontPreview) URL.revokeObjectURL(frontPreview);

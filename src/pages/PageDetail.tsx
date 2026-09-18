@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Page, PageSection, ContactSettings } from '../types';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/errors';
+import { collection, query, where, getDocs, limit } from '../lib/supabase';
+import { db } from '../lib/supabase';
+import { handleFirestoreError, OperationType } from '../lib/errors';
 import { ChevronLeft, Calendar, Loader2, ArrowRight, MessageSquare, PhoneCall } from 'lucide-react';
 import { motion } from 'motion/react';
 import SEOHead from '../components/SEOHead';

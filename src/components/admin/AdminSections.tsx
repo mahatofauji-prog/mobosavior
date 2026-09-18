@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, writeBatch } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { WebsiteSection } from '../../types';
 import { DEFAULT_WEBSITE_SECTIONS } from '../../data/defaultSections';
 import { getAllSectionsMerged } from '../../utils/sectionSettings';

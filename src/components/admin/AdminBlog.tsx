@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { db } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { BlogPost, BlogCategory } from '../../types';
 import { 
   Plus, Edit, Trash2, Save, X, Eye, FileText, Calendar, User, Tag, 
   Settings, Loader2, Sparkles, Image as ImageIcon, Search, CheckSquare 
 } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../firebase/errors';
+import { handleFirestoreError, OperationType } from '../../lib/errors';
 import ImageUploader from './ImageUploader';
 
 interface AdminBlogProps {

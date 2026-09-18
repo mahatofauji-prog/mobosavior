@@ -397,8 +397,16 @@ export const DEFAULT_SEO: SEOSettings = {
 };
 
 // Seeding function
+let hasAttemptedSeed = false;
+
 export async function seedDatabaseIfEmpty() {
+  if (hasAttemptedSeed) return;
+  hasAttemptedSeed = true;
+
   try {
+    if (typeof window !== 'undefined' && localStorage.getItem('ms_seeded_ok') === 'true') {
+      return;
+    }
     // 1. Check if settings/branding exists
     try {
       const checkDocRef = doc(db, 'settings', 'branding');

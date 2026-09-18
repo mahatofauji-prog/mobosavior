@@ -7,6 +7,14 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const db = 'supabase';
 
+const warnedMessages = new Set<string>();
+export function warnOnce(key: string, msg: string) {
+  if (!warnedMessages.has(key)) {
+    warnedMessages.add(key);
+    console.warn(msg);
+  }
+}
+
 export function collection(db: any, path: string) {
   return { type: 'collection', path };
 }
@@ -153,7 +161,7 @@ export async function setDoc(docRef: any, data: any, options?: any) {
       updated_at: new Date().toISOString()
     };
     const { error } = await (supabase.from('settings' as any)).upsert(payload);
-    if (error) console.warn('Supabase settings setDoc error:', error.message);
+    if (error) warnOnce('settings_setDoc', `Supabase settings setDoc notice: ${error.message}`);
     return;
   }
 
@@ -173,8 +181,11 @@ export async function setDoc(docRef: any, data: any, options?: any) {
   
   const { error } = await (supabase.from(col as any)).upsert(payload);
   if (error) {
-    // If column doesn't match, attempt silent fallback or log
-    console.warn(`Supabase upsert on ${col}:`, error.message);
+    if (error.code === '42501' || error.message?.includes('row-level security')) {
+      warnOnce(`rls_${col}`, `Supabase RLS notice: Table '${col}' requires public access. (Run FIX-SUPABASE-PERMISSIONS.sql in SQL Editor)`);
+    } else {
+      warnOnce(`upsert_${col}`, `Supabase notice on ${col}: ${error.message}`);
+    }
   }
 }
 

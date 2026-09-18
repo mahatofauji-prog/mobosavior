@@ -1,5 +1,7 @@
 
 
+import { supabase } from './supabase';
+
 export interface UploadOptions {
   folder?: string;
   allowedTypes?: string[];
@@ -43,6 +45,75 @@ const DEFAULT_VIDEO_TYPES = [
 ];
 
 export const ALLOWED_MEDIA_TYPES = [...DEFAULT_IMAGE_TYPES, ...DEFAULT_VIDEO_TYPES];
+
+/**
+ * Converts any File to a base64 Data URL
+ */
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Compresses an image to a clean, lightweight WebP base64 Data URL.
+ * Automatically fits inside maxDim (default 1200px) and quality 0.8.
+ * Typically produces a 30KB - 80KB data URL which can be saved safely in Supabase or displayed anywhere.
+ */
+export async function compressImageToDataUrl(
+  file: File,
+  maxDim: number = 1200,
+  quality: number = 0.8
+): Promise<{ dataUrl: string; size: number }> {
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+    const dataUrl = await fileToDataUrl(file).catch(() => '');
+    return { dataUrl, size: file.size };
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve({ dataUrl: e.target?.result as string, size: file.size });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/webp', quality);
+        const size = Math.round((dataUrl.length * 3) / 4);
+        resolve({ dataUrl, size });
+      };
+      img.onerror = () => {
+        resolve({ dataUrl: e.target?.result as string, size: file.size });
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = async () => {
+      const dataUrl = await fileToDataUrl(file).catch(() => '');
+      resolve({ dataUrl, size: file.size });
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 /**
  * Validates a custom thumbnail or image file prior to upload (Max 15MB, JPG/PNG/WEBP/GIF)
@@ -216,6 +287,63 @@ export async function uploadMediaFile(
     };
   }
 
+  const isImage = processedFile.type.startsWith('image/') || 
+    ['.jpg', '.jpeg', '.png', '.webp', '.gif'].some(ext => processedFile.name.toLowerCase().endsWith(ext));
+
+  // Helper for instant, high-efficiency data URL fallback
+  const getFallbackResult = async (): Promise<UploadResult> => {
+    if (isImage) {
+      onProgress?.(50);
+      const { dataUrl, size } = await compressImageToDataUrl(processedFile, 1200, 0.8);
+      onProgress?.(100);
+      if (dataUrl) {
+        return {
+          success: true,
+          url: dataUrl,
+          filename: processedFile.name,
+          size,
+          mimeType: 'image/webp'
+        };
+      }
+    }
+    return {
+      success: false,
+      url: '',
+      filename: file.name,
+      size: file.size,
+      mimeType: file.type,
+      error: 'Upload endpoint unavailable. Please try again.'
+    };
+  };
+
+  // Try Supabase Storage first if bucket is available
+  try {
+    const sPath = generateStoragePath(processedFile, folder);
+    const { data: sData, error: sErr } = await supabase.storage
+      .from('mobosavior-media')
+      .upload(sPath, processedFile, {
+        cacheControl: '3600',
+        upsert: true
+      });
+    if (!sErr && sData) {
+      const { data: urlData } = supabase.storage
+        .from('mobosavior-media')
+        .getPublicUrl(sPath);
+      if (urlData?.publicUrl) {
+        onProgress?.(100);
+        return {
+          success: true,
+          url: urlData.publicUrl,
+          filename: processedFile.name,
+          size: processedFile.size,
+          mimeType: processedFile.type
+        };
+      }
+    }
+  } catch {
+    // Continue to server or data URL fallback
+  }
+
   const uniquePath = generateStoragePath(processedFile, folder);
 
   // Native App Server Upload (/api/upload) with real XHR Progress
@@ -233,12 +361,20 @@ export async function uploadMediaFile(
       }
     };
 
-    xhr.onload = () => {
+    xhr.onload = async () => {
       const rawText = (xhr.responseText || '').trim();
       const status = xhr.status;
 
-      // 1. Handle HTTP error status codes (e.g. 400, 401, 403, 404, 413, 500)
+      // 1. Handle HTTP error status codes (e.g. 400, 401, 403, 404, 405, 413, 500)
       if (status < 200 || status >= 300) {
+        if (isImage) {
+          const fallback = await getFallbackResult();
+          if (fallback.success) {
+            resolve(fallback);
+            return;
+          }
+        }
+
         let errorMessage = `Upload failed with status ${status}.`;
         if (status === 401 || status === 403) {
           errorMessage = 'Authentication failed. Please ensure you are logged in as an administrator.';
@@ -288,6 +424,13 @@ export async function uploadMediaFile(
 
       // 3. Handle unexpected HTML responses (e.g. login redirect, proxy error)
       if (rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html') || rawText.startsWith('<head')) {
+        if (isImage) {
+          const fallback = await getFallbackResult();
+          if (fallback.success) {
+            resolve(fallback);
+            return;
+          }
+        }
         resolve({
           success: false,
           url: '',
@@ -380,7 +523,14 @@ export async function uploadMediaFile(
       });
     };
 
-    xhr.onerror = () => {
+    xhr.onerror = async () => {
+      if (isImage) {
+        const fallback = await getFallbackResult();
+        if (fallback.success) {
+          resolve(fallback);
+          return;
+        }
+      }
       resolve({
         success: false,
         url: '',
@@ -391,7 +541,14 @@ export async function uploadMediaFile(
       });
     };
 
-    xhr.ontimeout = () => {
+    xhr.ontimeout = async () => {
+      if (isImage) {
+        const fallback = await getFallbackResult();
+        if (fallback.success) {
+          resolve(fallback);
+          return;
+        }
+      }
       resolve({
         success: false,
         url: '',

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { db } from '../lib/supabase';
 import { collection, doc, writeBatch, serverTimestamp } from '../lib/supabase';
-import { uploadMediaFile } from '../lib/storageUpload';
+import { uploadMediaFile, compressImageToDataUrl } from '../lib/storageUpload';
 import { Brand, PhoneModel, Service, Branch } from '../types';
 
 interface BookingFormProps {
@@ -112,21 +112,35 @@ export default function BookingForm({
     try {
       const serviceId = generateServiceId();
       
-      // Upload Images
+      // Upload Images with fail-safe resilience
       let frontImageUrl = '';
       let backImageUrl = '';
       
-      const frontRes = await uploadMediaFile(frontImage, { folder: `service-bookings/${serviceId}` });
-      if (!frontRes.success || !frontRes.url) {
-        throw new Error(frontRes.error || 'Failed to upload front image of device');
+      try {
+        const frontRes = await uploadMediaFile(frontImage, { folder: `service-bookings/${serviceId}` });
+        if (frontRes.success && frontRes.url) {
+          frontImageUrl = frontRes.url;
+        } else {
+          const { dataUrl } = await compressImageToDataUrl(frontImage, 1200, 0.8);
+          frontImageUrl = dataUrl;
+        }
+      } catch {
+        const { dataUrl } = await compressImageToDataUrl(frontImage, 1200, 0.8);
+        frontImageUrl = dataUrl;
       }
-      frontImageUrl = frontRes.url;
 
-      const backRes = await uploadMediaFile(backImage, { folder: `service-bookings/${serviceId}` });
-      if (!backRes.success || !backRes.url) {
-        throw new Error(backRes.error || 'Failed to upload back image of device');
+      try {
+        const backRes = await uploadMediaFile(backImage, { folder: `service-bookings/${serviceId}` });
+        if (backRes.success && backRes.url) {
+          backImageUrl = backRes.url;
+        } else {
+          const { dataUrl } = await compressImageToDataUrl(backImage, 1200, 0.8);
+          backImageUrl = dataUrl;
+        }
+      } catch {
+        const { dataUrl } = await compressImageToDataUrl(backImage, 1200, 0.8);
+        backImageUrl = dataUrl;
       }
-      backImageUrl = backRes.url;
 
       // Save to Firestore (Batch write to public and private collections)
       const batch = writeBatch(db);

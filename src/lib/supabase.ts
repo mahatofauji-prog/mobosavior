@@ -65,12 +65,26 @@ function buildSupabaseQuery(q: any) {
 
 export async function getDocs(q: any) {
   const { data, error } = await buildSupabaseQuery(q);
-  if (error) {
-    // Silent return to prevent flooding the console with 62 warnings when tables are being initialized
-    return { empty: true, size: 0, docs: [], forEach: (cb: any) => {} };
-  }
+  let list = data || [];
+
+  // Merge with local offline cache for bookings if Supabase query failed or returned empty
+  try {
+    const col = q.path;
+    if (col === 'service_bookings' || col === 'service_bookings_public') {
+      const storageKey = `ms_backup_${col}`;
+      const cachedStr = localStorage.getItem(storageKey);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        const existingIds = new Set(list.map((d: any) => d.id || d.service_id));
+        for (const item of cached) {
+          if (!existingIds.has(item.id) && !existingIds.has(item.service_id)) {
+            list.push(item);
+          }
+        }
+      }
+    }
+  } catch {}
   
-  const list = data || [];
   return {
     empty: list.length === 0,
     size: list.length,
@@ -108,6 +122,18 @@ export async function getDoc(docRef: any) {
 
   const { data, error } = await (supabase.from(col as any)).select('*').eq('id', id).maybeSingle();
   if (error || !data) {
+    // If not found in Supabase (e.g. RLS blocked or offline), check localStorage
+    try {
+      const storageKey = `ms_backup_${col}`;
+      const cachedStr = localStorage.getItem(storageKey);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        const match = cached.find((item: any) => item.id === id || item.service_id === id);
+        if (match) {
+          return { exists: () => true, data: () => match, id, ref: docRef };
+        }
+      }
+    } catch {}
     return { exists: () => false, data: () => undefined, id };
   }
   
@@ -133,6 +159,17 @@ export async function setDoc(docRef: any, data: any, options?: any) {
 
   const payload = { ...data };
   if (id) payload.id = id;
+
+  // Cache to localStorage for offline persistence / immediate accessibility
+  try {
+    if (col === 'service_bookings' || col === 'service_bookings_public' || col === 'bookings') {
+      const storageKey = `ms_backup_${col}`;
+      const existingStr = localStorage.getItem(storageKey);
+      const items = existingStr ? JSON.parse(existingStr) : [];
+      const updated = [payload, ...items.filter((item: any) => item.id !== payload.id && item.service_id !== payload.service_id)];
+      localStorage.setItem(storageKey, JSON.stringify(updated.slice(0, 100)));
+    }
+  } catch {}
   
   const { error } = await (supabase.from(col as any)).upsert(payload);
   if (error) {
@@ -166,16 +203,35 @@ export async function deleteDoc(docRef: any) {
   if (error) throw error;
 }
 
-export function onSnapshot(q: any, callback: any, errorCallback?: any) {
-  const col = q.path;
-  
-  const channel = supabase.channel(`public:${col}`)
+export function onSnapshot(target: any, callback: any, errorCallback?: any) {
+  const isDoc = target?.type === 'doc';
+  const parts = (target?.path || '').split('/');
+  const col = parts[0] || 'general';
+  const docId = isDoc ? parts[1] : undefined;
+
+  const fetchCurrent = async () => {
+    try {
+      if (isDoc) {
+        const snap = await getDoc(target);
+        callback(snap);
+      } else {
+        const snap = await getDocs(target);
+        callback(snap);
+      }
+    } catch (err) {
+      if (errorCallback) errorCallback(err);
+      else console.error('onSnapshot fetch error:', err);
+    }
+  };
+
+  const channelName = `public:${col}:${docId || 'all'}:${Math.random().toString(36).substring(2, 7)}`;
+  const channel = supabase.channel(channelName)
     .on('postgres_changes', { event: '*', schema: 'public', table: col }, () => {
-      getDocs(q).then(snapshot => callback(snapshot)).catch(console.error);
+      fetchCurrent();
     })
     .subscribe();
     
-  getDocs(q).then(snapshot => callback(snapshot)).catch(console.error);
+  fetchCurrent();
     
   return () => {
     supabase.removeChannel(channel);

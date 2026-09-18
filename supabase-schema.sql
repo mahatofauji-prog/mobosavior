@@ -642,3 +642,35 @@ ALTER PUBLICATION supabase_realtime ADD TABLE
 
 -- Notify PostgREST to immediately refresh its schema cache
 NOTIFY pgrst, 'reload schema';
+
+-- ==========================================================
+-- STORAGE BUCKET SETUP FOR MEDIA & BOOKINGS
+-- ==========================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('mobosavior-media', 'mobosavior-media', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Storage Read' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Public Storage Read" ON storage.objects FOR SELECT USING (bucket_id = 'mobosavior-media');
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Storage Insert' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Public Storage Insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'mobosavior-media');
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Storage Update' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Public Storage Update" ON storage.objects FOR UPDATE USING (bucket_id = 'mobosavior-media');
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Public Storage Delete' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Public Storage Delete" ON storage.objects FOR DELETE USING (bucket_id = 'mobosavior-media');
+  END IF;
+END $$;
+

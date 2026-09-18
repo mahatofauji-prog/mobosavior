@@ -407,6 +407,9 @@ export async function seedDatabaseIfEmpty() {
     if (typeof window !== 'undefined' && localStorage.getItem('ms_seeded_ok') === 'true') {
       return;
     }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ms_seeded_ok', 'true');
+    }
     // 1. Check if settings/branding exists
     try {
       const checkDocRef = doc(db, 'settings', 'branding');
@@ -484,8 +487,11 @@ export async function seedDatabaseIfEmpty() {
         for (const brand of DEFAULT_BRANDS) {
           await setDoc(doc(db, 'brands', brand.id), brand);
         }
-        for (const model of DEFAULT_MODELS) {
-          await setDoc(doc(db, 'models', model.id), model);
+        // Seed models in small chunks of 15 to avoid mobile network exhaustion
+        const chunkSize = 15;
+        for (let i = 0; i < DEFAULT_MODELS.length; i += chunkSize) {
+          const chunk = DEFAULT_MODELS.slice(i, i + chunkSize);
+          await Promise.all(chunk.map(m => setDoc(doc(db, 'models', m.id), m)));
         }
       }
     } catch (brandsErr) {}

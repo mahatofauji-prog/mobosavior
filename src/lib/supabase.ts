@@ -7,11 +7,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const db = 'supabase';
 
-const warnedMessages = new Set<string>();
-export function warnOnce(key: string, msg: string) {
-  // Suppressed to keep console 100% clean and pristine
-}
-
 export function collection(db: any, path: string) {
   return { type: 'collection', path };
 }
@@ -69,8 +64,13 @@ function buildSupabaseQuery(q: any) {
 }
 
 export async function getDocs(q: any) {
-  const { data, error } = await buildSupabaseQuery(q);
-  let list = data || [];
+  let list: any[] = [];
+  try {
+    const { data, error } = await buildSupabaseQuery(q);
+    if (!error && data) {
+      list = data;
+    }
+  } catch {}
 
   // Merge with local offline cache for bookings if Supabase query failed or returned empty
   try {
@@ -111,38 +111,42 @@ export async function getDocs(q: any) {
 }
 
 export async function getDoc(docRef: any) {
-  const parts = docRef.path.split('/');
-  if (parts.length < 2) return { exists: () => false };
-  const col = parts[0];
-  const id = parts[1];
-  
-  if (col === 'settings') {
-    const { data, error } = await (supabase.from('settings' as any)).select('*').eq('id', id).maybeSingle();
+  try {
+    const parts = docRef.path.split('/');
+    if (parts.length < 2) return { exists: () => false };
+    const col = parts[0];
+    const id = parts[1];
+    
+    if (col === 'settings') {
+      const { data, error } = await (supabase.from('settings' as any)).select('*').eq('id', id).maybeSingle();
+      if (error || !data) {
+        return { exists: () => false, data: () => undefined, id };
+      }
+      const unwrapped = data.data && Object.keys(data.data).length > 0 ? data.data : (data.value || data);
+      return { exists: () => true, data: () => ({ id, ...unwrapped }), id, ref: docRef };
+    }
+
+    const { data, error } = await (supabase.from(col as any)).select('*').eq('id', id).maybeSingle();
     if (error || !data) {
+      // If not found in Supabase (e.g. RLS blocked or offline), check localStorage
+      try {
+        const storageKey = `ms_backup_${col}`;
+        const cachedStr = localStorage.getItem(storageKey);
+        if (cachedStr) {
+          const cached = JSON.parse(cachedStr);
+          const match = cached.find((item: any) => item.id === id || item.service_id === id);
+          if (match) {
+            return { exists: () => true, data: () => match, id, ref: docRef };
+          }
+        }
+      } catch {}
       return { exists: () => false, data: () => undefined, id };
     }
-    const unwrapped = data.data && Object.keys(data.data).length > 0 ? data.data : (data.value || data);
-    return { exists: () => true, data: () => ({ id, ...unwrapped }), id, ref: docRef };
+    
+    return { exists: () => true, data: () => data, id, ref: docRef };
+  } catch {
+    return { exists: () => false, data: () => undefined, id: docRef?.id };
   }
-
-  const { data, error } = await (supabase.from(col as any)).select('*').eq('id', id).maybeSingle();
-  if (error || !data) {
-    // If not found in Supabase (e.g. RLS blocked or offline), check localStorage
-    try {
-      const storageKey = `ms_backup_${col}`;
-      const cachedStr = localStorage.getItem(storageKey);
-      if (cachedStr) {
-        const cached = JSON.parse(cachedStr);
-        const match = cached.find((item: any) => item.id === id || item.service_id === id);
-        if (match) {
-          return { exists: () => true, data: () => match, id, ref: docRef };
-        }
-      }
-    } catch {}
-    return { exists: () => false, data: () => undefined, id };
-  }
-  
-  return { exists: () => true, data: () => data, id, ref: docRef };
 }
 
 export async function setDoc(docRef: any, data: any, options?: any) {
@@ -157,8 +161,9 @@ export async function setDoc(docRef: any, data: any, options?: any) {
       value: data,
       updated_at: new Date().toISOString()
     };
-    const { error } = await (supabase.from('settings' as any)).upsert(payload);
-    if (error) warnOnce('settings_setDoc', `Supabase settings setDoc notice: ${error.message}`);
+    try {
+      await (supabase.from('settings' as any)).upsert(payload);
+    } catch {}
     return;
   }
 

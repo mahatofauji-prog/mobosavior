@@ -95,7 +95,7 @@ export default function BookingForm({
                     (today.getMonth() + 1).toString().padStart(2, '0') + 
                     today.getDate().toString().padStart(2, '0');
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    return `MOBO-${dateStr}-${randomNum}`;
+    return `MSR-${dateStr}-${randomNum}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,7 +203,22 @@ export default function BookingForm({
       });
     } catch (err: any) {
       console.error('Booking submission error:', err);
-      setError('An error occurred while submitting your request. Please try again.');
+      let errorMsg = 'An error occurred while submitting your request. Please try again.';
+      
+      if (err.message) {
+        const msgLower = err.message.toLowerCase();
+        if (msgLower.includes('upload')) {
+          errorMsg = 'Device photo upload failed. Please try again.';
+        } else if (msgLower.includes('network') || msgLower.includes('offline')) {
+          errorMsg = 'Connection problem. Please check your internet connection and try again.';
+        } else if (msgLower.includes('permission') || msgLower.includes('firestore') || msgLower.includes('missing or insufficient permissions')) {
+          errorMsg = 'Unable to save your booking due to server permissions. Please try again later.';
+        } else {
+          errorMsg = err.message;
+        }
+      }
+      
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

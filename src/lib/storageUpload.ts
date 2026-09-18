@@ -1,4 +1,6 @@
 
+import { storage } from '../firebase/config';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 export interface UploadOptions {
   folder?: string;
@@ -189,7 +191,7 @@ async function compressImageFile(file: File): Promise<File> {
 }
 
 /**
- * Performs actual media upload with real progress tracking and compression
+ * Performs actual media upload with real progress tracking and compression using Firebase Storage
  */
 export async function uploadMediaFile(
   file: File,
@@ -218,214 +220,87 @@ export async function uploadMediaFile(
 
   const uniquePath = generateStoragePath(processedFile, folder);
 
-  // Native App Server Upload (/api/upload) with real XHR Progress
+  // 3. Upload to Firebase Storage
   return new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append('folder', folder);
-    formData.append('path', uniquePath);
-    formData.append('file', processedFile, processedFile.name);
+    try {
+      const storageRef = ref(storage, uniquePath);
+      const uploadTask = uploadBytesResumable(storageRef, processedFile, {
+        contentType: processedFile.type,
+      });
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        onProgress(Math.min(percent, 100));
-      }
-    };
-
-    xhr.onload = () => {
-      const rawText = (xhr.responseText || '').trim();
-      const status = xhr.status;
-
-      // 1. Handle HTTP error status codes (e.g. 400, 401, 403, 404, 413, 500)
-      if (status < 200 || status >= 300) {
-        let errorMessage = `Upload failed with status ${status}.`;
-        if (status === 401 || status === 403) {
-          errorMessage = 'Authentication failed. Please ensure you are logged in as an administrator.';
-        } else if (status === 413) {
-          errorMessage = 'Image size must be 15 MB or less.';
-        } else if (status === 404) {
-          errorMessage = 'Upload server endpoint (/api/upload) not found.';
-        } else if (status >= 500) {
-          errorMessage = 'Storage server encountered an internal error. Please try again.';
-        }
-
-        if (rawText) {
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          if (onProgress) {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            onProgress(Math.round(progress));
+          }
+        },
+        (error) => {
+          console.error('Firebase Storage Upload Error:', error);
+          resolve({
+            success: false,
+            url: '',
+            filename: file.name,
+            size: file.size,
+            mimeType: file.type,
+            error: error.message || 'Upload to Firebase Storage failed.',
+          });
+        },
+        async () => {
           try {
-            const parsedErr = JSON.parse(rawText);
-            if (parsedErr.message) errorMessage = parsedErr.message;
-            else if (parsedErr.error) errorMessage = parsedErr.error;
-          } catch {
-            if (rawText.length < 200 && !rawText.startsWith('<')) {
-              errorMessage = rawText;
-            }
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            if (onProgress) onProgress(100);
+            resolve({
+              success: true,
+              url: downloadURL,
+              filename: processedFile.name,
+              size: processedFile.size,
+              mimeType: processedFile.type,
+            });
+          } catch (urlError: any) {
+            console.error('Error getting download URL:', urlError);
+            resolve({
+              success: false,
+              url: '',
+              filename: file.name,
+              size: file.size,
+              mimeType: file.type,
+              error: urlError.message || 'Could not retrieve download URL after upload.',
+            });
           }
         }
-
-        resolve({
-          success: false,
-          url: '',
-          filename: file.name,
-          size: file.size,
-          mimeType: file.type,
-          error: errorMessage
-        });
-        return;
-      }
-
-      // 2. Handle empty response
-      if (!rawText) {
-        resolve({
-          success: false,
-          url: '',
-          filename: file.name,
-          size: file.size,
-          mimeType: file.type,
-          error: 'Empty response received from storage server.'
-        });
-        return;
-      }
-
-      // 3. Handle unexpected HTML responses (e.g. login redirect, proxy error)
-      if (rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html') || rawText.startsWith('<head')) {
-        resolve({
-          success: false,
-          url: '',
-          filename: file.name,
-          size: file.size,
-          mimeType: file.type,
-          error: 'Server returned an HTML page instead of upload response. Please check your session.'
-        });
-        return;
-      }
-
-      // 4. Parse JSON or handle raw URL string
-      let parsed: any = null;
-      try {
-        parsed = JSON.parse(rawText);
-      } catch {
-        // If it's a plain string URL returned directly
-        if (rawText.startsWith('http://') || rawText.startsWith('https://') || rawText.startsWith('/uploads/')) {
-          onProgress?.(100);
-          resolve({
-            success: true,
-            url: rawText,
-            filename: processedFile.name,
-            size: processedFile.size,
-            mimeType: processedFile.type
-          });
-          return;
-        }
-
-        resolve({
-          success: false,
-          url: '',
-          filename: file.name,
-          size: file.size,
-          mimeType: file.type,
-          error: `Malformed server response: ${rawText.slice(0, 100)}`
-        });
-        return;
-      }
-
-      // 5. Handle parsed string primitive
-      if (typeof parsed === 'string') {
-        if (parsed.startsWith('http://') || parsed.startsWith('https://') || parsed.startsWith('/uploads/')) {
-          onProgress?.(100);
-          resolve({
-            success: true,
-            url: parsed,
-            filename: processedFile.name,
-            size: processedFile.size,
-            mimeType: processedFile.type
-          });
-          return;
-        }
-      }
-
-      // 6. Handle standard JSON response object
-      if (parsed && typeof parsed === 'object') {
-        const fileUrl = parsed.url || parsed.path || parsed.fileUrl || parsed.data?.url;
-        if (parsed.success !== false && fileUrl) {
-          onProgress?.(100);
-          resolve({
-            success: true,
-            url: fileUrl,
-            filename: parsed.filename || processedFile.name,
-            size: parsed.size || processedFile.size,
-            mimeType: parsed.mimetype || processedFile.type
-          });
-          return;
-        }
-
-        const failMessage = parsed.message || parsed.error || 'Server indicated upload failure.';
-        resolve({
-          success: false,
-          url: '',
-          filename: file.name,
-          size: file.size,
-          mimeType: file.type,
-          error: failMessage
-        });
-        return;
-      }
-
+      );
+    } catch (err: any) {
+      console.error('Upload initiation error:', err);
       resolve({
         success: false,
         url: '',
         filename: file.name,
         size: file.size,
         mimeType: file.type,
-        error: 'Invalid response structure from storage server.'
+        error: err.message || 'Failed to start upload process.',
       });
-    };
-
-    xhr.onerror = () => {
-      resolve({
-        success: false,
-        url: '',
-        filename: file.name,
-        size: file.size,
-        mimeType: file.type,
-        error: 'Network error occurred during file upload. Please check your connection.'
-      });
-    };
-
-    xhr.ontimeout = () => {
-      resolve({
-        success: false,
-        url: '',
-        filename: file.name,
-        size: file.size,
-        mimeType: file.type,
-        error: 'Upload timed out. The file might be too large or the connection is slow.'
-      });
-    };
-
-    // 5 minutes timeout for uploads
-    xhr.timeout = 300000;
-    xhr.open('POST', `/api/upload?folder=${encodeURIComponent(folder)}`, true);
-    xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
-    xhr.send(formData);
+    }
   });
 }
 
 /**
- * Helper to safely delete or clean up an uploaded media file
+ * Helper to safely delete or clean up an uploaded media file from Firebase Storage
  */
 export async function deleteMediaFile(fileUrl: string): Promise<boolean> {
   if (!fileUrl) return true;
-  if (!fileUrl.startsWith('/uploads/')) return true; // Only delete local uploads
-  try {
-    const res = await fetch('/api/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: fileUrl })
-    });
-    const data = await res.json();
-    return data.success;
-  } catch (err) {
-    console.warn('Failed to delete media file:', err);
-    return false;
+  // If it's a firebase storage URL, delete it
+  if (fileUrl.includes('firebasestorage.googleapis.com')) {
+    try {
+      const storageRef = ref(storage, fileUrl);
+      await deleteObject(storageRef);
+      return true;
+    } catch (err) {
+      console.warn('Failed to delete media file from Firebase Storage:', err);
+      return false;
+    }
   }
+  // Ignore local uploads if any remain
+  return true;
 }

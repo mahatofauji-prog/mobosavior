@@ -303,33 +303,45 @@ export default function AdminServiceBookings() {
                       
                       <div className="space-y-4">
                         <div>
-                          <p className="text-xs font-bold text-slate-600 mb-2">Front Side</p>
+                          <p className="text-xs font-bold text-slate-600 mb-2 uppercase">Front Photo</p>
                           <div className="bg-slate-200 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center">
-                            <img src={selectedBooking.front_image_url} alt="Front" className="object-contain w-full h-full" />
+                            {selectedBooking.front_image_url ? (
+                              <img 
+                                src={selectedBooking.front_image_url} 
+                                alt="Front" 
+                                className="object-contain w-full h-full cursor-pointer hover:opacity-90 transition-opacity" 
+                                onClick={() => window.open(selectedBooking.front_image_url, '_blank')}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`text-slate-400 text-xs font-semibold ${selectedBooking.front_image_url ? 'hidden' : 'block absolute'}`}>
+                              Image unavailable
+                            </div>
                           </div>
-                          <a 
-                            href={selectedBooking.front_image_url} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="mt-2 text-[11px] font-bold text-[#0284C7] flex items-center gap-1 hover:underline"
-                          >
-                            <Download className="w-3 h-3" /> Download Front Photo
-                          </a>
                         </div>
                         
                         <div>
-                          <p className="text-xs font-bold text-slate-600 mb-2">Back Side</p>
+                          <p className="text-xs font-bold text-slate-600 mb-2 uppercase">Back Photo</p>
                           <div className="bg-slate-200 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center">
-                            <img src={selectedBooking.back_image_url} alt="Back" className="object-contain w-full h-full" />
+                            {selectedBooking.back_image_url ? (
+                              <img 
+                                src={selectedBooking.back_image_url} 
+                                alt="Back" 
+                                className="object-contain w-full h-full cursor-pointer hover:opacity-90 transition-opacity" 
+                                onClick={() => window.open(selectedBooking.back_image_url, '_blank')}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`text-slate-400 text-xs font-semibold ${selectedBooking.back_image_url ? 'hidden' : 'block absolute'}`}>
+                              Image unavailable
+                            </div>
                           </div>
-                          <a 
-                            href={selectedBooking.back_image_url} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="mt-2 text-[11px] font-bold text-[#0284C7] flex items-center gap-1 hover:underline"
-                          >
-                            <Download className="w-3 h-3" /> Download Back Photo
-                          </a>
                         </div>
                       </div>
                     </div>

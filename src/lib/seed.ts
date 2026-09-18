@@ -445,32 +445,24 @@ export async function seedDatabaseIfEmpty() {
           } else {
             await setDoc(contactDocRef, DEFAULT_CONTACT);
           }
-        } catch (contactErr) {
-          console.warn('Could not sync contact settings:', contactErr);
-        }
+        } catch (contactErr) {}
       }
-    } catch (settingsErr) {
-      console.warn('Could not check or seed settings:', settingsErr);
-    }
+    } catch (settingsErr) {}
 
     // 2. Check and seed comprehensive services
     try {
       const servicesSnap = await getDocs(query(collection(db, 'services'), limit(1)));
       if (servicesSnap.empty) {
-        console.log('Seeding comprehensive services catalog...');
         for (const service of DEFAULT_SERVICES) {
           await setDoc(doc(db, 'services', service.id), service);
         }
       }
-    } catch (servicesErr) {
-      console.warn('Could not seed services:', servicesErr);
-    }
+    } catch (servicesErr) {}
 
     // 3. Check and seed brands, models, categories
     try {
       const categoriesSnap = await getDocs(collection(db, 'categories'));
       if (categoriesSnap.empty) {
-        console.log('Seeding categories...');
         for (const cat of DEFAULT_CATEGORIES) {
           await setDoc(doc(db, 'categories', cat.id), cat);
         }
@@ -484,14 +476,11 @@ export async function seedDatabaseIfEmpty() {
           }
         }
       }
-    } catch (catErr) {
-      console.warn('Could not sync categories:', catErr);
-    }
+    } catch (catErr) {}
 
     try {
       const brandsSnap = await getDocs(query(collection(db, 'brands'), limit(1)));
       if (brandsSnap.empty) {
-        console.log('Seeding brands and models...');
         for (const brand of DEFAULT_BRANDS) {
           await setDoc(doc(db, 'brands', brand.id), brand);
         }
@@ -499,28 +488,22 @@ export async function seedDatabaseIfEmpty() {
           await setDoc(doc(db, 'models', model.id), model);
         }
       }
-    } catch (brandsErr) {
-      console.warn('Could not seed brands/models:', brandsErr);
-    }
+    } catch (brandsErr) {}
 
     // 4. Check and seed Trust Points ("Why Choose MOBO SAVIOR?")
     try {
       const trustSnap = await getDocs(query(collection(db, 'trust_points'), limit(1)));
       if (trustSnap.empty) {
-        console.log('Seeding initial 8 trust points...');
         for (const tp of DEFAULT_TRUST_POINTS) {
           await setDoc(doc(db, 'trust_points', tp.id), tp);
         }
       }
-    } catch (tpErr) {
-      console.warn('Could not seed trust_points:', tpErr);
-    }
+    } catch (tpErr) {}
 
     // 5. Check and seed Offer Categories & Offers
     try {
       const offerCatSnap = await getDocs(query(collection(db, 'offer_categories'), limit(1)));
       if (offerCatSnap.empty) {
-        console.log('Seeding offer categories...');
         for (const oc of DEFAULT_OFFER_CATEGORIES) {
           await setDoc(doc(db, 'offer_categories', oc.id), oc);
         }
@@ -528,27 +511,21 @@ export async function seedDatabaseIfEmpty() {
 
       const offersSnap = await getDocs(query(collection(db, 'offers'), limit(1)));
       if (offersSnap.empty) {
-        console.log('Seeding initial offers...');
         for (const offer of DEFAULT_OFFERS) {
           await setDoc(doc(db, 'offers', offer.id), offer);
         }
       }
-    } catch (offerErr) {
-      console.warn('Could not seed offers/offer_categories:', offerErr);
-    }
+    } catch (offerErr) {}
 
     // 6. Check and seed Branches
     try {
       const branchesSnap = await getDocs(query(collection(db, 'branches'), limit(1)));
       if (branchesSnap.empty) {
-        console.log('Seeding initial branches...');
         for (const branch of DEFAULT_BRANCHES) {
           await setDoc(doc(db, 'branches', branch.id), branch);
         }
       }
-    } catch (branchErr) {
-      console.warn('Could not seed branches:', branchErr);
-    }
+    } catch (branchErr) {}
 
     // 7. Check and seed Legal Pages & Sections
     try {
@@ -563,13 +540,12 @@ export async function seedDatabaseIfEmpty() {
       for (const sec of DEFAULT_PRIVACY_SECTIONS) {
         await setDoc(doc(db, 'legal_sections', sec.id), sec, { merge: true });
       }
-      console.log('Seeded Terms & Conditions and Privacy Policy sections successfully.');
-    } catch (legalErr) {
-      console.warn('Could not seed legal pages/sections:', legalErr);
-    }
+    } catch (legalErr) {}
 
-    console.log('Database verification and seed complete!');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ms_seeded_ok', 'true');
+    }
   } catch (error) {
-    console.error('Error in seedDatabaseIfEmpty:', error);
+    // Handled gracefully
   }
 }

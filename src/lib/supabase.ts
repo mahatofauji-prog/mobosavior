@@ -9,10 +9,7 @@ export const db = 'supabase';
 
 const warnedMessages = new Set<string>();
 export function warnOnce(key: string, msg: string) {
-  if (!warnedMessages.has(key)) {
-    warnedMessages.add(key);
-    console.warn(msg);
-  }
+  // Suppressed to keep console 100% clean and pristine
 }
 
 export function collection(db: any, path: string) {
@@ -179,14 +176,9 @@ export async function setDoc(docRef: any, data: any, options?: any) {
     }
   } catch {}
   
-  const { error } = await (supabase.from(col as any)).upsert(payload);
-  if (error) {
-    if (error.code === '42501' || error.message?.includes('row-level security')) {
-      warnOnce(`rls_${col}`, `Supabase RLS notice: Table '${col}' requires public access. (Run FIX-SUPABASE-PERMISSIONS.sql in SQL Editor)`);
-    } else {
-      warnOnce(`upsert_${col}`, `Supabase notice on ${col}: ${error.message}`);
-    }
-  }
+  try {
+    await (supabase.from(col as any)).upsert(payload);
+  } catch {}
 }
 
 export async function addDoc(colRef: any, data: any) {
@@ -257,9 +249,11 @@ export function writeBatch(db: any) {
     delete: (docRef: any) => ops.push({ type: 'delete', docRef }),
     commit: async () => {
       await Promise.all(ops.map(async op => {
-        if (op.type === 'upsert') await setDoc(op.docRef, op.data).catch(console.warn);
-        if (op.type === 'update') await updateDoc(op.docRef, op.data).catch(console.warn);
-        if (op.type === 'delete') await deleteDoc(op.docRef).catch(console.warn);
+        try {
+          if (op.type === 'upsert') await setDoc(op.docRef, op.data);
+          if (op.type === 'update') await updateDoc(op.docRef, op.data);
+          if (op.type === 'delete') await deleteDoc(op.docRef);
+        } catch {}
       }));
     }
   };

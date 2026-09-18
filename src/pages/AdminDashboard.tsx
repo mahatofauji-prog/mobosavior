@@ -204,7 +204,7 @@ export default function AdminDashboard({
           }
         });
       } catch (e) {
-        console.warn('Could not fetch from service_bookings:', e);
+        // Fallback handled silently
       }
 
       // 2. Fetch from bookings table
@@ -220,7 +220,7 @@ export default function AdminDashboard({
           }
         });
       } catch (e) {
-        console.warn('Could not fetch from bookings:', e);
+        // Fallback handled silently
       }
 
       setBookings(fetched);

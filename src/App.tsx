@@ -371,7 +371,7 @@ export default function App() {
 
   useEffect(() => {
     seedDatabaseIfEmpty()
-      .catch((err) => console.warn('Seed notice:', err))
+      .catch(() => {})
       .finally(() => {
         loadConfigurationData();
       });

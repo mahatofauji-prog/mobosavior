@@ -274,7 +274,7 @@ export default function AdminGalleryManager() {
     setAfterFile(null);
     setVideoFile(null);
     setVideoUploadMode('url');
-    setExtractedThumbnailUrl(item.thumbnailUrl || null);
+    setExtractedThumbnailUrl(item.thumbnailUrl || item.thumbnail_url || item.imageUrl || null);
     setExtractedThumbnailBlob(null);
     setCustomThumbnailFile(null);
     setFrameTimestamp(1.0);

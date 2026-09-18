@@ -42,10 +42,16 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
 
--- 3. Storage Bucket Configuration for Media
+-- 3. Ensure all extended columns exist on tables (safe migrations)
+ALTER TABLE IF EXISTS public.gallery ADD COLUMN IF NOT EXISTS brand TEXT;
+ALTER TABLE IF EXISTS public.gallery ADD COLUMN IF NOT EXISTS model TEXT;
+ALTER TABLE IF EXISTS public.gallery ADD COLUMN IF NOT EXISTS "serviceSlug" TEXT;
+ALTER TABLE IF EXISTS public.gallery ADD COLUMN IF NOT EXISTS service_slug TEXT;
+
+-- 4. Storage Bucket Configuration for Media
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('mobosavior-media', 'mobosavior-media', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- 4. Notify PostgREST to reload the schema cache immediately
+-- 5. Notify PostgREST to reload the schema cache immediately
 NOTIFY pgrst, 'reload schema';

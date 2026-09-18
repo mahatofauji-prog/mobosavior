@@ -238,7 +238,8 @@ export default function AdminGalleryManager() {
       const itemId = editingItem ? editingItem.id : `gal-${Date.now()}`;
       const finalCategoryId = mapCategoryToId(category) || (mediaType === 'video' ? 'repairing_videos' : 'repairing');
 
-      const payload: any = {
+      // Build safe base payload with guaranteed database columns
+      const baseGalleryPayload: any = {
         id: itemId,
         title: title || (mediaType === 'video' ? 'Repair Video' : 'Repair Gallery Item'),
         description: description || '',
@@ -253,25 +254,49 @@ export default function AdminGalleryManager() {
         youtubeVideoId: youtubeVideoId || null,
         beforeImageUrl: finalBeforeUrl || null,
         afterImageUrl: finalAfterUrl || null,
-        serviceSlug: serviceSlug || null,
-        brand: brand || null,
-        model: model || null,
+        altText: [brand, model, title].filter(Boolean).join(' - ') || null,
         featured: !!featured,
         active: active !== false,
         is_active: active !== false,
         displayOrder: Number(displayOrder) || 1,
         display_order: Number(displayOrder) || 1,
-        createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
+        createdAt: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString(),
         created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
-      const { error: saveErr } = await supabase.from('gallery').upsert(payload);
+      // Extended payload including brand/model/serviceSlug if present in database schema
+      const extendedGalleryPayload: any = {
+        ...baseGalleryPayload,
+        serviceSlug: serviceSlug || null,
+        service_slug: serviceSlug || null,
+        brand: brand || null,
+        model: model || null
+      };
+
+      let saveErr = null;
+      const firstAttempt = await supabase.from('gallery').upsert(extendedGalleryPayload);
+      if (firstAttempt.error) {
+        if (firstAttempt.error.code === 'PGRST204' || firstAttempt.error.message.includes('column') || firstAttempt.error.message.includes('schema cache')) {
+          console.warn('[Supabase Gallery]: Extended columns not yet migrated in database, saving base schema with altText metadata...', firstAttempt.error.message);
+          const secondAttempt = await supabase.from('gallery').upsert(baseGalleryPayload);
+          saveErr = secondAttempt.error;
+        } else {
+          saveErr = firstAttempt.error;
+        }
+      }
+
       if (saveErr) {
-        console.error('[Supabase Gallery Save Error]:', saveErr);
+        console.error('[GALLERY SAVE ERROR]', {
+          payload: baseGalleryPayload,
+          message: saveErr.message,
+          code: saveErr.code,
+          details: saveErr.details,
+          hint: saveErr.hint
+        });
         throw saveErr;
       }
 
-      // If it's a video, also sync to videos table
+      // If it's a video, also sync to videos table (which supports brand, model, serviceSlug)
       if (mediaType === 'video' && finalVideoUrl) {
         const videoPayload = {
           id: itemId,
@@ -288,14 +313,14 @@ export default function AdminGalleryManager() {
           is_active: active !== false,
           displayOrder: Number(displayOrder) || 1,
           display_order: Number(displayOrder) || 1,
-          createdAt: payload.createdAt,
-          created_at: payload.created_at,
+          createdAt: baseGalleryPayload.createdAt,
+          created_at: baseGalleryPayload.created_at,
           serviceSlug: serviceSlug || null,
           brand: brand || null,
           model: model || null
         };
         const { error: vErr } = await supabase.from('videos').upsert(videoPayload);
-        if (vErr) console.warn('[Supabase Sync Video Error]:', vErr);
+        if (vErr) console.warn('[Supabase Sync Video Warning]:', vErr);
       }
 
       setModalOpen(false);

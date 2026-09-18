@@ -412,7 +412,11 @@ CREATE TABLE public.gallery (
     "displayOrder" INT DEFAULT 0,
     display_order INT DEFAULT 0,
     "createdAt" TEXT DEFAULT NOW()::text,
-    created_at TEXT DEFAULT NOW()::text
+    created_at TEXT DEFAULT NOW()::text,
+    "serviceSlug" TEXT,
+    service_slug TEXT,
+    brand TEXT,
+    model TEXT
 );
 
 -- 18. VIDEOS TABLE

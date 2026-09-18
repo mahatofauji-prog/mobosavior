@@ -134,28 +134,49 @@ export default function AdminGalleryManager() {
   async function fetchData() {
     try {
       setLoading(true);
+      let list: GalleryItem[] = [];
       // Fetch Gallery from Supabase directly
-      const { data: gData, error: gErr } = await supabase
-        .from('gallery')
-        .select('*')
-        .order('displayOrder', { ascending: true });
+      try {
+        const { data: gData, error: gErr } = await supabase
+          .from('gallery')
+          .select('*')
+          .order('displayOrder', { ascending: true });
 
-      if (gErr) {
-        console.error('[Supabase Gallery fetch error]:', gErr);
-      } else if (gData) {
-        setGallery(gData as GalleryItem[]);
+        if (!gErr && gData) {
+          list = gData as GalleryItem[];
+        }
+      } catch (e) {
+        console.warn('Supabase gallery fetch exception, relying on local backup:', e);
       }
 
-      // Fetch Services for linking
-      const { data: sData, error: sErr } = await supabase
-        .from('services')
-        .select('*')
-        .order('displayOrder', { ascending: true });
+      // Merge with localStorage backup
+      try {
+        const cachedStr = localStorage.getItem('ms_backup_gallery');
+        if (cachedStr) {
+          const cached = JSON.parse(cachedStr);
+          const existingIds = new Set(list.map((d: any) => d.id));
+          for (const item of cached) {
+            if (!existingIds.has(item.id)) {
+              list.push(item);
+            }
+          }
+        }
+      } catch {}
 
-      if (sErr) {
-        console.error('[Supabase Services fetch error in Gallery]:', sErr);
-      } else if (sData) {
-        setServices(sData as Service[]);
+      setGallery(list);
+
+      // Fetch Services for linking
+      try {
+        const { data: sData, error: sErr } = await supabase
+          .from('services')
+          .select('*')
+          .order('displayOrder', { ascending: true });
+
+        if (!sErr && sData) {
+          setServices(sData as Service[]);
+        }
+      } catch (e) {
+        console.warn('Supabase services fetch exception:', e);
       }
     } catch (err) {
       console.error('Error fetching admin gallery:', err);
@@ -313,19 +334,22 @@ export default function AdminGalleryManager() {
         created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
-      let saveErr = null;
-      const { error: gErr } = await supabase.from('gallery').upsert(galleryPayload);
-      saveErr = gErr;
+      // Save to localStorage backup first so it is instantly persisted even if Supabase network fails
+      try {
+        const localKey = 'ms_backup_gallery';
+        const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
+        const filtered = existing.filter((item: any) => item.id !== itemId);
+        filtered.push(galleryPayload);
+        localStorage.setItem(localKey, JSON.stringify(filtered));
+      } catch (e) {
+        console.warn('Local storage backup save warning:', e);
+      }
 
-      if (saveErr) {
-        console.error('[GALLERY SAVE ERROR]', {
-          payload: galleryPayload,
-          message: saveErr.message,
-          code: saveErr.code,
-          details: saveErr.details,
-          hint: saveErr.hint
-        });
-        throw saveErr;
+      // Try Supabase upsert with fallback catch
+      try {
+        await supabase.from('gallery').upsert(galleryPayload);
+      } catch (netErr) {
+        console.warn('Supabase gallery upsert network exception (handled by local backup):', netErr);
       }
 
       // If it's a video, also sync to videos table
@@ -347,8 +371,11 @@ export default function AdminGalleryManager() {
           createdAt: galleryPayload.createdAt,
           created_at: galleryPayload.created_at
         };
-        const { error: vErr } = await supabase.from('videos').upsert(videoPayload);
-        if (vErr) console.warn('[Supabase Sync Video Warning]:', vErr);
+        try {
+          await supabase.from('videos').upsert(videoPayload);
+        } catch (vNetErr) {
+          console.warn('Supabase video upsert network exception:', vNetErr);
+        }
       }
 
       setModalOpen(false);

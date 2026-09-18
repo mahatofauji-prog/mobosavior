@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { signOut } from '../lib/supabase';
+import { supabase, signOut } from '../lib/supabase';
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../lib/supabase';
 import { auth, db } from '../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../lib/storageUpload';
@@ -150,12 +150,19 @@ export default function AdminDashboard({
 
   // CRUD Modal States
   const [serviceModal, setServiceModal] = useState<{ open: boolean; item?: Service }>({ open: false });
+  const [isSavingService, setIsSavingService] = useState(false);
   const [faqModal, setFaqModal] = useState<{ open: boolean; item?: FAQItem }>({ open: false });
   const [reviewModal, setReviewModal] = useState<{ open: boolean; item?: Review }>({ open: false });
   const [slideModal, setSlideModal] = useState<{ open: boolean; item?: SlideItem | null }>({ open: false });
   
   const [serviceFormImageUrl, setServiceFormImageUrl] = useState('');
   const [slideFormImageUrl, setSlideFormImageUrl] = useState('');
+
+  useEffect(() => {
+    if (servicesList && servicesList.length > 0) {
+      setServices(servicesList);
+    }
+  }, [servicesList]);
 
   useEffect(() => {
     if (serviceModal.open) {
@@ -617,68 +624,172 @@ export default function AdminDashboard({
   // Service CRUD operations
   const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingService) return;
+
     const form = e.target as HTMLFormElement;
     const data = new FormData(form);
     
-    const id = serviceModal.item?.id || data.get('slug') as string;
+    const id = serviceModal.item?.id || (data.get('slug') as string)?.trim();
+    if (!id) {
+      alert('Service slug or ID is required.');
+      return;
+    }
+
+    setIsSavingService(true);
     
-    // Parse modelPrices (Format: Model=Price|Model=Price)
-    const modelPricesRaw = data.get('modelPrices') as string || '';
-    const modelPrices = modelPricesRaw.split('|').filter(Boolean).map(item => {
-      const parts = item.split('=');
-      return { model: parts[0]?.trim() || '', price: parts[1]?.trim() || '' };
-    }).filter(i => i.model);
-
-    // Parse faqs (Format: Q=A|Q=A)
-    const faqsRaw = data.get('faqs') as string || '';
-    const faqs = faqsRaw.split('|').filter(Boolean).map(item => {
-      const parts = item.split('=');
-      return { question: parts[0]?.trim() || '', answer: parts[1]?.trim() || '' };
-    }).filter(i => i.question);
-
-    const srv: Service = {
-      id,
-      name: data.get('name') as string,
-      slug: data.get('slug') as string,
-      category: data.get('category') as string,
-      description: data.get('description') as string,
-      imageUrl: (data.get('imageUrl') as string)?.trim() || serviceModal.item?.imageUrl || '',
-      price: data.get('price') as string || '',
-      priceType: data.get('priceType') as any,
-      estimatedTime: data.get('estimatedTime') as string || '',
-      problemsCovered: (data.get('problemsCovered') as string).split(',').map(p => p.trim()).filter(Boolean),
-      symptoms: (data.get('symptoms') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
-      diagnosisProcess: data.get('diagnosisProcess') as string || '',
-      repairProcessSteps: (data.get('repairProcessSteps') as string)?.split('|').map(p => p.trim()).filter(Boolean) || [],
-      toolsAndTech: (data.get('toolsAndTech') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
-      supportedBrands: (data.get('supportedBrands') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
-      supportedModels: (data.get('supportedModels') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [],
-      modelPrices,
-      warranty: data.get('warranty') as string || '',
-      importantNotes: data.get('importantNotes') as string || '',
-      faqs,
-      active: data.get('active') === 'true',
-      featured: data.get('featured') === 'true',
-      displayOrder: parseInt(data.get('displayOrder') as string) || 5
-    };
-
     try {
-      await setDoc(doc(db, 'services', id), srv);
+      // Parse modelPrices (Format: Model=Price|Model=Price)
+      const modelPricesRaw = data.get('modelPrices') as string || '';
+      const modelPrices = modelPricesRaw.split('|').filter(Boolean).map(item => {
+        const parts = item.split('=');
+        return { model: parts[0]?.trim() || '', price: parts[1]?.trim() || '' };
+      }).filter(i => i.model);
+
+      // Parse faqs (Format: Q=A|Q=A)
+      const faqsRaw = data.get('faqs') as string || '';
+      const faqs = faqsRaw.split('|').filter(Boolean).map(item => {
+        const parts = item.split('=');
+        return { question: parts[0]?.trim() || '', answer: parts[1]?.trim() || '' };
+      }).filter(i => i.question);
+
+      const symptoms = (data.get('symptoms') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [];
+      const problemsCovered = symptoms.length > 0 
+        ? symptoms 
+        : ((data.get('problemsCovered') as string)?.split(',').map(p => p.trim()).filter(Boolean) || []);
+
+      const name = (data.get('name') as string)?.trim() || '';
+      const slug = (data.get('slug') as string)?.trim() || '';
+      const category = (data.get('category') as string)?.trim() || 'General';
+      const description = (data.get('description') as string)?.trim() || '';
+      const imageUrl = (serviceFormImageUrl || (data.get('imageUrl') as string))?.trim() || serviceModal.item?.imageUrl || '';
+      const price = (data.get('price') as string)?.trim() || '';
+      const priceType = data.get('priceType') as any;
+      const estimatedTime = (data.get('estimatedTime') as string)?.trim() || '';
+      const diagnosisProcess = (data.get('diagnosisProcess') as string)?.trim() || '';
+      const repairProcessSteps = (data.get('repairProcessSteps') as string)?.split('|').map(p => p.trim()).filter(Boolean) || [];
+      const toolsAndTech = (data.get('toolsAndTech') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [];
+      const supportedBrands = (data.get('supportedBrands') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [];
+      const supportedModels = (data.get('supportedModels') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [];
+      const warranty = (data.get('warranty') as string)?.trim() || '';
+      const importantNotes = (data.get('importantNotes') as string)?.trim() || '';
+      const active = data.get('active') === 'true';
+      const featured = data.get('featured') === 'true';
+      const displayOrder = parseInt(data.get('displayOrder') as string) || 5;
+
+      const payload: any = {
+        name,
+        slug,
+        category,
+        description,
+        imageUrl,
+        image_url: imageUrl,
+        price,
+        priceType,
+        price_type: priceType,
+        estimatedTime,
+        estimated_time: estimatedTime,
+        problemsCovered,
+        problems_covered: problemsCovered,
+        symptoms,
+        diagnosisProcess,
+        repairProcessSteps,
+        toolsAndTech,
+        supportedBrands,
+        supportedModels,
+        modelPrices,
+        warranty,
+        importantNotes,
+        faqs,
+        active,
+        is_active: active,
+        featured,
+        displayOrder,
+        display_order: displayOrder,
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      let savedRecord: any = null;
+
+      if (serviceModal.item) {
+        // Real Supabase UPDATE
+        const { data: updateRes, error: updateErr } = await supabase
+          .from('services')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          console.error('[MOBO ADMIN SAVE ERROR - services update]:', {
+            table: 'services',
+            id,
+            error: updateErr
+          });
+          throw updateErr;
+        }
+        savedRecord = updateRes;
+      } else {
+        // Real Supabase INSERT
+        payload.id = id;
+        payload.createdAt = new Date().toISOString();
+        payload.created_at = new Date().toISOString();
+        const { data: insertRes, error: insertErr } = await supabase
+          .from('services')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.error('[MOBO ADMIN SAVE ERROR - services insert]:', {
+            table: 'services',
+            id,
+            error: insertErr
+          });
+          throw insertErr;
+        }
+        savedRecord = insertRes;
+      }
+
+      // Update local state immediately with returned record
+      setServices(prev => {
+        if (serviceModal.item) {
+          return prev.map(s => s.id === id ? { ...s, ...savedRecord } : s);
+        } else {
+          return [...prev, savedRecord as Service];
+        }
+      });
+
       setServiceModal({ open: false });
-      onRefreshData();
+      if (onRefreshData) onRefreshData();
       alert('Service saved successfully!');
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Failed to save service:', err);
+      alert('Failed to save service: ' + (err?.message || 'Database error. Please check connection and console.'));
+    } finally {
+      setIsSavingService(false);
     }
   };
 
   const handleDeleteService = async (id: string) => {
     if (confirm('Are you sure you want to delete this service?')) {
       try {
-        await deleteDoc(doc(db, 'services', id));
-        onRefreshData();
-      } catch (err) {
-        console.error(err);
+        const { error } = await supabase
+          .from('services')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('[MOBO ADMIN DELETE ERROR - services]:', error);
+          throw error;
+        }
+
+        setServices(prev => prev.filter(s => s.id !== id));
+        if (onRefreshData) onRefreshData();
+        alert('Service deleted successfully.');
+      } catch (err: any) {
+        console.error('Error deleting service:', err);
+        alert('Failed to delete service: ' + (err?.message || 'Database error.'));
       }
     }
   };
@@ -1394,52 +1505,6 @@ export default function AdminDashboard({
               onRefreshData={onRefreshData} 
               defaultTab="models"
             />
-          </div>
-        )}
-
-        {activeTab === 'prices' && (
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-[#0284C7]" />
-                Service & Model Pricing Management
-              </h3>
-              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                Configure starting base prices, estimate ranges, and model-specific repair costs across your catalog.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {services.map((svc) => (
-                <div key={svc.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-extrabold text-slate-800 text-sm">{svc.name}</h4>
-                      <span className="px-2 py-0.5 bg-sky-50 text-[#0284C7] font-bold rounded text-[10px]">{svc.category}</span>
-                    </div>
-                    <p className="text-slate-500 text-[11px] line-clamp-1">{svc.description}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">
-                      Pricing Mode: <span className="font-bold text-slate-700">{svc.priceType || 'Starting Price'}</span>
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Starting Cost</span>
-                      <span className="text-sm font-black text-emerald-600">
-                        {typeof svc.price === 'number' ? `₹${svc.price}` : svc.price || '₹999'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setServiceModal({ open: true, item: svc })}
-                      className="px-3 py-2 bg-white border border-slate-200 hover:border-[#0284C7] text-slate-700 hover:text-[#0284C7] rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm"
-                    >
-                      <Edit className="w-3.5 h-3.5" /> Edit Price
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -2171,7 +2236,7 @@ export default function AdminDashboard({
         )}
 
         {activeTab === 'prices' && (
-          <AdminPrices />
+          <AdminPrices onRefreshData={onRefreshData} />
         )}
 
         {activeTab === 'trust' && (
@@ -2333,10 +2398,27 @@ export default function AdminDashboard({
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-slate-100">
-                <button type="submit" className="flex-1 py-3 bg-[#0284C7] text-white font-bold rounded-xl hover:bg-[#0369A1]">
-                  Save Service Details
+                <button 
+                  type="submit" 
+                  disabled={isSavingService}
+                  className="flex-1 py-3 bg-[#0284C7] disabled:bg-slate-300 text-white font-bold rounded-xl hover:bg-[#0369A1] transition-all flex items-center justify-center gap-2"
+                >
+                  {isSavingService ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving Service Details...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" /> Save Service Details
+                    </>
+                  )}
                 </button>
-                <button type="button" onClick={() => setServiceModal({ open: false })} className="px-6 py-3 border border-slate-200 text-slate-500 font-bold rounded-xl hover:bg-slate-50">
+                <button 
+                  type="button" 
+                  disabled={isSavingService}
+                  onClick={() => setServiceModal({ open: false })} 
+                  className="px-6 py-3 border border-slate-200 text-slate-500 font-bold rounded-xl hover:bg-slate-50 disabled:opacity-50"
+                >
                   Cancel
                 </button>
               </div>

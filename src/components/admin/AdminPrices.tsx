@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
+import { supabase, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
 import { db } from '../../lib/supabase';
 import { PriceItem, PriceType, Service, Brand, PhoneModel } from '../../types';
 import { getFormattedPriceString, formatAmount } from '../../utils/priceHelpers';
@@ -7,15 +7,20 @@ import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';
 import { DEFAULT_BRANDS, DEFAULT_MODELS } from '../../data/modelsData';
 import { 
   DollarSign, Plus, Edit2, Trash2, Search, Filter, Check, X, 
-  Layers, Smartphone, ShieldCheck, AlertCircle, RefreshCw, Eye, EyeOff, Tag, SlidersHorizontal
+  Layers, Smartphone, ShieldCheck, AlertCircle, RefreshCw, Eye, EyeOff, Tag, SlidersHorizontal, Loader2
 } from 'lucide-react';
 
-export default function AdminPrices() {
+interface AdminPricesProps {
+  onRefreshData?: () => void;
+}
+
+export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
   const [prices, setPrices] = useState<PriceItem[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<PhoneModel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,38 +58,115 @@ export default function AdminPrices() {
   async function fetchInitialData() {
     setLoading(true);
     try {
-      // 1. Fetch Prices
-      const qPrices = query(collection(db, 'prices'), orderBy('displayOrder', 'asc'));
-      const pricesSnap = await getDocs(qPrices);
-      const fetchedPrices: PriceItem[] = [];
-      pricesSnap.forEach(docSnap => {
-        fetchedPrices.push({ id: docSnap.id, ...docSnap.data() } as PriceItem);
-      });
-      setPrices(fetchedPrices);
+      // 1. Fetch Prices directly from Supabase
+      const { data: pData, error: pErr } = await supabase
+        .from('prices')
+        .select('*')
+        .order('display_order', { ascending: true });
 
-      // 2. Fetch Services
-      const servicesSnap = await getDocs(collection(db, 'services'));
-      const fetchedServices: Service[] = [];
-      servicesSnap.forEach(docSnap => {
-        fetchedServices.push({ id: docSnap.id, ...docSnap.data() } as Service);
-      });
-      setServices(fetchedServices.length > 0 ? fetchedServices : ALL_COMPREHENSIVE_SERVICES);
+      if (pData && pData.length > 0) {
+        const mappedPrices: PriceItem[] = pData.map(p => ({
+          id: p.id,
+          serviceSlug: p.service_slug || p.serviceSlug,
+          serviceName: p.service_name || p.serviceName,
+          category: p.category,
+          brand: p.brand || undefined,
+          model: p.model || undefined,
+          displayVariant: p.display_variant || p.displayVariant || undefined,
+          priceType: p.price_type || p.priceType || 'starting_from',
+          amount: p.amount !== null && p.amount !== undefined ? Number(p.amount) : undefined,
+          currency: p.currency || '₹',
+          notes: p.notes || undefined,
+          isActive: p.is_active ?? p.isActive ?? true,
+          displayOrder: p.display_order ?? p.displayOrder ?? 1,
+          createdAt: p.created_at || p.createdAt,
+          updatedAt: p.updated_at || p.updatedAt
+        }));
+        setPrices(mappedPrices);
+      } else {
+        const qPrices = query(collection(db, 'prices'), orderBy('displayOrder', 'asc'));
+        const pricesSnap = await getDocs(qPrices);
+        const fetchedPrices: PriceItem[] = [];
+        pricesSnap.forEach(docSnap => {
+          fetchedPrices.push({ id: docSnap.id, ...docSnap.data() } as PriceItem);
+        });
+        setPrices(fetchedPrices);
+      }
+
+      // 2. Fetch Services from Supabase
+      const { data: sData } = await supabase.from('services').select('*').order('display_order', { ascending: true });
+      if (sData && sData.length > 0) {
+        setServices(sData.map(s => ({
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          category: s.category,
+          price: s.price,
+          priceType: s.price_type || s.priceType || 'starting_from',
+          estimatedTime: s.estimated_time || s.estimatedTime,
+          warranty: s.warranty,
+          description: s.description,
+          icon: s.icon,
+          features: s.features || [],
+          problemsCovered: s.problems_covered || s.problemsCovered || [],
+          popular: s.popular || false,
+          active: s.is_active ?? s.active ?? true,
+          featured: s.featured ?? false,
+          categoryBadge: s.category_badge || s.categoryBadge,
+          displayOrder: s.display_order ?? s.displayOrder ?? 1
+        })));
+      } else {
+        const servicesSnap = await getDocs(collection(db, 'services'));
+        const fetchedServices: Service[] = [];
+        servicesSnap.forEach(docSnap => {
+          fetchedServices.push({ id: docSnap.id, ...docSnap.data() } as Service);
+        });
+        setServices(fetchedServices.length > 0 ? fetchedServices : ALL_COMPREHENSIVE_SERVICES);
+      }
 
       // 3. Fetch Brands
-      const brandsSnap = await getDocs(collection(db, 'brands'));
-      const fetchedBrands: Brand[] = [];
-      brandsSnap.forEach(docSnap => {
-        fetchedBrands.push({ id: docSnap.id, ...docSnap.data() } as Brand);
-      });
-      setBrands(fetchedBrands.length > 0 ? fetchedBrands : DEFAULT_BRANDS);
+      const { data: bData } = await supabase.from('brands').select('*').order('display_order', { ascending: true });
+      if (bData && bData.length > 0) {
+        setBrands(bData.map(b => ({
+          id: b.id,
+          name: b.name,
+          slug: b.slug,
+          logoUrl: b.logo_url || b.logoUrl || '',
+          displayOrder: b.display_order ?? b.displayOrder ?? 1,
+          active: b.is_active ?? b.active ?? true
+        })));
+      } else {
+        const brandsSnap = await getDocs(collection(db, 'brands'));
+        const fetchedBrands: Brand[] = [];
+        brandsSnap.forEach(docSnap => {
+          fetchedBrands.push({ id: docSnap.id, ...docSnap.data() } as Brand);
+        });
+        setBrands(fetchedBrands.length > 0 ? fetchedBrands : DEFAULT_BRANDS);
+      }
 
       // 4. Fetch Models
-      const modelsSnap = await getDocs(collection(db, 'models'));
-      const fetchedModels: PhoneModel[] = [];
-      modelsSnap.forEach(docSnap => {
-        fetchedModels.push({ id: docSnap.id, ...docSnap.data() } as PhoneModel);
-      });
-      setModels(fetchedModels.length > 0 ? fetchedModels : DEFAULT_MODELS);
+      const { data: mData } = await supabase.from('models').select('*').order('display_order', { ascending: true });
+      if (mData && mData.length > 0) {
+        setModels(mData.map(m => ({
+          id: m.id,
+          name: m.name,
+          slug: m.slug,
+          brand: m.brand,
+          releaseYear: m.release_year ?? m.releaseYear,
+          imageUrl: m.image_url || m.imageUrl || '',
+          displayOrder: m.display_order ?? m.displayOrder ?? 1,
+          active: m.is_active ?? m.active ?? true,
+          servicePrices: m.service_prices || m.servicePrices || {},
+          availableServices: m.available_services || m.availableServices || []
+        })));
+      } else {
+        const modelsSnap = await getDocs(collection(db, 'models'));
+        const fetchedModels: PhoneModel[] = [];
+        modelsSnap.forEach(docSnap => {
+          fetchedModels.push({ id: docSnap.id, ...docSnap.data() } as PhoneModel);
+        });
+        setModels(fetchedModels.length > 0 ? fetchedModels : DEFAULT_MODELS);
+      }
     } catch (err) {
       console.error('Error fetching data for AdminPrices:', err);
       setServices(ALL_COMPREHENSIVE_SERVICES);
@@ -151,9 +233,10 @@ export default function AdminPrices() {
     }
   };
 
-  // Handle Save Price (Create / Update)
+  // Handle Save Price (Create / Update) in Supabase
   const handleSavePrice = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     if (!formState.serviceSlug) {
       alert('Please select a service.');
       return;
@@ -164,61 +247,141 @@ export default function AdminPrices() {
       return;
     }
 
+    setIsSaving(true);
     try {
+      const isEdit = Boolean(editingPrice?.id);
       const id = editingPrice ? editingPrice.id : `price-${Date.now()}`;
       const now = new Date().toISOString();
 
       const matchedService = services.find(s => s.slug === formState.serviceSlug);
       const serviceName = matchedService ? matchedService.name : formState.serviceName || formState.serviceSlug;
+      const category = formState.category || matchedService?.category || '';
+      const amountVal = formState.amount ? Number(formState.amount) : null;
+      const orderVal = Number(formState.displayOrder) || 1;
 
-      const priceData: PriceItem = {
-        id,
+      const payload: any = {
+        service_slug: formState.serviceSlug,
         serviceSlug: formState.serviceSlug,
-        serviceName,
-        category: formState.category || matchedService?.category || '',
-        brand: formState.brand.trim() || undefined,
-        model: formState.model.trim() || undefined,
-        displayVariant: formState.displayVariant.trim() || undefined,
+        service_name: serviceName,
+        serviceName: serviceName,
+        category: category,
+        brand: formState.brand.trim() || null,
+        model: formState.model.trim() || null,
+        display_variant: formState.displayVariant.trim() || null,
+        displayVariant: formState.displayVariant.trim() || null,
+        price_type: formState.priceType,
         priceType: formState.priceType,
-        amount: formState.amount ? Number(formState.amount) : undefined,
+        amount: amountVal,
         currency: formState.currency || '₹',
-        notes: formState.notes.trim() || undefined,
+        notes: formState.notes.trim() || null,
+        is_active: formState.isActive,
         isActive: formState.isActive,
-        displayOrder: Number(formState.displayOrder) || 1,
-        createdAt: editingPrice ? editingPrice.createdAt || now : now,
+        display_order: orderVal,
+        displayOrder: orderVal,
+        updated_at: now,
         updatedAt: now
       };
 
-      await setDoc(doc(db, 'prices', id), priceData);
+      let savedRecord: any = null;
+
+      if (isEdit) {
+        const { data: updateRes, error: updateErr } = await supabase
+          .from('prices')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          console.error('[MOBO ADMIN SAVE ERROR - prices update]:', { table: 'prices', id, error: updateErr });
+          throw updateErr;
+        }
+        savedRecord = updateRes;
+      } else {
+        payload.id = id;
+        payload.created_at = now;
+        payload.createdAt = now;
+        const { data: insertRes, error: insertErr } = await supabase
+          .from('prices')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.error('[MOBO ADMIN SAVE ERROR - prices insert]:', { table: 'prices', id, error: insertErr });
+          throw insertErr;
+        }
+        savedRecord = insertRes;
+      }
+
+      const mappedSaved: PriceItem = {
+        id: savedRecord.id || id,
+        serviceSlug: savedRecord.service_slug || savedRecord.serviceSlug || formState.serviceSlug,
+        serviceName: savedRecord.service_name || savedRecord.serviceName || serviceName,
+        category: savedRecord.category || category,
+        brand: savedRecord.brand || formState.brand || undefined,
+        model: savedRecord.model || formState.model || undefined,
+        displayVariant: savedRecord.display_variant || savedRecord.displayVariant || formState.displayVariant || undefined,
+        priceType: savedRecord.price_type || savedRecord.priceType || formState.priceType,
+        amount: savedRecord.amount !== null && savedRecord.amount !== undefined ? Number(savedRecord.amount) : (amountVal ?? undefined),
+        currency: savedRecord.currency || formState.currency || '₹',
+        notes: savedRecord.notes || formState.notes || undefined,
+        isActive: savedRecord.is_active ?? savedRecord.isActive ?? formState.isActive,
+        displayOrder: savedRecord.display_order ?? savedRecord.displayOrder ?? orderVal,
+        createdAt: savedRecord.created_at || savedRecord.createdAt || now,
+        updatedAt: savedRecord.updated_at || savedRecord.updatedAt || now
+      };
+
+      setPrices(prev => isEdit ? prev.map(p => p.id === id ? mappedSaved : p) : [...prev, mappedSaved]);
       setIsModalOpen(false);
-      fetchInitialData();
-      alert(`Price ${editingPrice ? 'updated' : 'added'} successfully!`);
-    } catch (err) {
+      await fetchInitialData();
+      alert(`Price rule ${isEdit ? 'updated' : 'added'} successfully!`);
+    } catch (err: any) {
       console.error('Error saving price:', err);
-      alert('Failed to save price. Please check database permissions.');
+      alert('Failed to save price: ' + (err?.message || 'Database error.'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Delete Price
+  // Delete Price from Supabase
   const handleDeletePrice = async (id: string) => {
     if (!confirm('Are you sure you want to delete this price rule? This cannot be undone.')) return;
     try {
-      await deleteDoc(doc(db, 'prices', id));
-      fetchInitialData();
-    } catch (err) {
+      const { error } = await supabase.from('prices').delete().eq('id', id);
+      if (error) {
+        console.error('[MOBO ADMIN DELETE ERROR - prices]:', error);
+        throw error;
+      }
+      setPrices(prev => prev.filter(p => p.id !== id));
+      await fetchInitialData();
+      alert('Price rule deleted successfully.');
+    } catch (err: any) {
       console.error('Error deleting price:', err);
-      alert('Failed to delete price.');
+      alert('Failed to delete price: ' + (err?.message || 'Database error.'));
     }
   };
 
-  // Toggle Active Status
+  // Toggle Active Status in Supabase
   const handleToggleActive = async (item: PriceItem) => {
     try {
-      await updateDoc(doc(db, 'prices', item.id), {
-        isActive: !item.isActive,
-        updatedAt: new Date().toISOString()
-      });
-      fetchInitialData();
+      const nextActive = !item.isActive;
+      const { error } = await supabase
+        .from('prices')
+        .update({
+          is_active: nextActive,
+          isActive: nextActive,
+          updated_at: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', item.id);
+
+      if (error) {
+        console.error('[MOBO ADMIN TOGGLE ERROR - prices]:', error);
+        throw error;
+      }
+
+      setPrices(prev => prev.map(p => p.id === item.id ? { ...p, isActive: nextActive } : p));
     } catch (err) {
       console.error('Error toggling active status:', err);
     }
@@ -757,16 +920,19 @@ export default function AdminPrices() {
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold rounded-xl shadow-sm transition-all"
+                  disabled={isSaving}
+                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save Price Rule
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSaving ? 'Saving...' : 'Save Price Rule'}
                 </button>
               </div>
             </form>

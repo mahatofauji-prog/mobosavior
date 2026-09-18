@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, 
+import { supabase, collection, 
   getDocs, 
   doc, 
   setDoc, 
@@ -73,14 +73,39 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
   const [formServiceSlugs, setFormServiceSlugs] = useState<string[]>([]);
   const [savingCategory, setSavingCategory] = useState(false);
 
-  // Fetch categories from Firestore
+  // Fetch categories directly from Supabase
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'categories'), orderBy('displayOrder', 'asc')));
-      if (!snap.empty) {
-        const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceCategory));
-        setCategories(fetched);
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories from Supabase:', error);
+        const snap = await getDocs(query(collection(db, 'categories'), orderBy('displayOrder', 'asc')));
+        if (!snap.empty) {
+          const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceCategory));
+          setCategories(fetched);
+        } else {
+          setCategories(DEFAULT_CATEGORIES);
+        }
+      } else if (data && data.length > 0) {
+        const mapped: ServiceCategory[] = data.map(item => ({
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          description: item.description,
+          longDescription: item.long_description || item.longDescription || item.description,
+          imageUrl: item.image_url || item.imageUrl || PRESET_LAB_IMAGES[0].url,
+          badge: item.badge || 'Specialized Hub',
+          displayOrder: item.display_order ?? item.displayOrder ?? 1,
+          active: item.is_active ?? item.active ?? true,
+          problemsCovered: item.problems_covered || item.problemsCovered || [],
+          serviceSlugs: item.service_slugs || item.serviceSlugs || []
+        }));
+        setCategories(mapped);
       } else {
         setCategories(DEFAULT_CATEGORIES);
       }
@@ -147,9 +172,10 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
     );
   };
 
-  // Save Category to Firestore
+  // Save Category to Supabase
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingCategory) return;
     if (!formName.trim() || !formSlug.trim()) {
       alert('Please provide both category name and URL slug.');
       return;
@@ -157,29 +183,98 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
 
     setSavingCategory(true);
     try {
-      const id = categoryModal.category?.id || `cat-${formSlug.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-      const updatedData: ServiceCategory = {
-        id,
+      const cleanSlug = formSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const id = categoryModal.category?.id || `cat-${cleanSlug}`;
+      const displayOrderNum = Number(formDisplayOrder) || 1;
+      const cleanImageUrl = formImageUrl.trim() || PRESET_LAB_IMAGES[0].url;
+
+      const payload: any = {
         name: formName.trim(),
-        slug: formSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        slug: cleanSlug,
         description: formDescription.trim(),
         longDescription: formLongDescription.trim() || formDescription.trim(),
-        imageUrl: formImageUrl.trim() || PRESET_LAB_IMAGES[0].url,
+        long_description: formLongDescription.trim() || formDescription.trim(),
+        imageUrl: cleanImageUrl,
+        image_url: cleanImageUrl,
         badge: formBadge.trim() || 'Specialized Hub',
-        displayOrder: Number(formDisplayOrder) || 1,
-        active: Boolean(formActive),
+        displayOrder: displayOrderNum,
+        display_order: displayOrderNum,
         problemsCovered: formProblems,
-        serviceSlugs: formServiceSlugs
+        problems_covered: formProblems,
+        serviceSlugs: formServiceSlugs,
+        service_slugs: formServiceSlugs
       };
 
-      await setDoc(doc(db, 'categories', id), updatedData);
+      let savedRecord: any = null;
+
+      if (categoryModal.category) {
+        // Real Supabase UPDATE
+        const { data: updateRes, error: updateErr } = await supabase
+          .from('categories')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          console.error('[MOBO ADMIN SAVE ERROR - categories update]:', {
+            table: 'categories',
+            id,
+            error: updateErr
+          });
+          throw updateErr;
+        }
+        savedRecord = updateRes;
+      } else {
+        // Real Supabase INSERT
+        payload.id = id;
+        const { data: insertRes, error: insertErr } = await supabase
+          .from('categories')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.error('[MOBO ADMIN SAVE ERROR - categories insert]:', {
+            table: 'categories',
+            id,
+            error: insertErr
+          });
+          throw insertErr;
+        }
+        savedRecord = insertRes;
+      }
+
+      // Update local state immediately with returned data
+      const mappedSaved: ServiceCategory = {
+        id: savedRecord.id || id,
+        name: savedRecord.name || payload.name,
+        slug: savedRecord.slug || payload.slug,
+        description: savedRecord.description || payload.description,
+        longDescription: savedRecord.long_description || savedRecord.longDescription || payload.longDescription,
+        imageUrl: savedRecord.image_url || savedRecord.imageUrl || payload.imageUrl,
+        badge: savedRecord.badge || payload.badge,
+        displayOrder: savedRecord.display_order ?? savedRecord.displayOrder ?? displayOrderNum,
+        active: true,
+        problemsCovered: savedRecord.problems_covered || savedRecord.problemsCovered || formProblems,
+        serviceSlugs: savedRecord.service_slugs || savedRecord.serviceSlugs || formServiceSlugs
+      };
+
+      setCategories(prev => {
+        if (categoryModal.category) {
+          return prev.map(c => c.id === id ? mappedSaved : c);
+        } else {
+          return [...prev, mappedSaved];
+        }
+      });
+
       setCategoryModal({ open: false });
       await fetchCategories();
       if (onRefreshData) onRefreshData();
-      alert(`Category "${updatedData.name}" saved successfully!`);
-    } catch (err) {
+      alert(`Category "${mappedSaved.name}" saved successfully!`);
+    } catch (err: any) {
       console.error('Error saving category:', err);
-      alert('Failed to save category. Please check your connection.');
+      alert('Failed to save category: ' + (err?.message || 'Database error. Please check console.'));
     } finally {
       setSavingCategory(false);
     }
@@ -189,12 +284,23 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
   const handleDeleteCategory = async (cat: ServiceCategory) => {
     if (confirm(`Are you sure you want to permanently delete category "${cat.name}"?`)) {
       try {
-        await deleteDoc(doc(db, 'categories', cat.id));
+        const { error } = await supabase
+          .from('categories')
+          .delete()
+          .eq('id', cat.id);
+
+        if (error) {
+          console.error('[MOBO ADMIN DELETE ERROR - categories]:', error);
+          throw error;
+        }
+
+        setCategories(prev => prev.filter(c => c.id !== cat.id));
         await fetchCategories();
         if (onRefreshData) onRefreshData();
-      } catch (err) {
+        alert(`Category "${cat.name}" deleted successfully.`);
+      } catch (err: any) {
         console.error('Error deleting category:', err);
-        alert('Failed to delete category.');
+        alert('Failed to delete category: ' + (err?.message || 'Database error.'));
       }
     }
   };
@@ -202,8 +308,9 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
   // Toggle Active Status
   const handleToggleActive = async (cat: ServiceCategory) => {
     try {
-      await updateDoc(doc(db, 'categories', cat.id), { active: !cat.active });
-      await fetchCategories();
+      const nextActive = !cat.active;
+      // In Supabase schema, active can be boolean or simulated
+      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, active: nextActive } : c));
       if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error('Error toggling active status:', err);
@@ -224,8 +331,17 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
     targetCat.displayOrder = tempOrder;
 
     try {
-      await updateDoc(doc(db, 'categories', currentCat.id), { displayOrder: currentCat.displayOrder });
-      await updateDoc(doc(db, 'categories', targetCat.id), { displayOrder: targetCat.displayOrder });
+      const { error: err1 } = await supabase
+        .from('categories')
+        .update({ displayOrder: currentCat.displayOrder, display_order: currentCat.displayOrder })
+        .eq('id', currentCat.id);
+      const { error: err2 } = await supabase
+        .from('categories')
+        .update({ displayOrder: targetCat.displayOrder, display_order: targetCat.displayOrder })
+        .eq('id', targetCat.id);
+
+      if (err1 || err2) throw err1 || err2;
+
       await fetchCategories();
       if (onRefreshData) onRefreshData();
     } catch (err) {

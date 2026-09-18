@@ -161,9 +161,11 @@ export async function setDoc(docRef: any, data: any, options?: any) {
       value: data,
       updated_at: new Date().toISOString()
     };
-    try {
-      await (supabase.from('settings' as any)).upsert(payload);
-    } catch {}
+    const { error } = await (supabase.from('settings' as any)).upsert(payload);
+    if (error) {
+      console.error(`[Supabase setDoc settings error]:`, error);
+      throw error;
+    }
     return;
   }
 
@@ -181,9 +183,11 @@ export async function setDoc(docRef: any, data: any, options?: any) {
     }
   } catch {}
   
-  try {
-    await (supabase.from(col as any)).upsert(payload);
-  } catch {}
+  const { error } = await (supabase.from(col as any)).upsert(payload);
+  if (error) {
+    console.error(`[Supabase setDoc ${col} error]:`, error);
+    throw error;
+  }
 }
 
 export async function addDoc(colRef: any, data: any) {

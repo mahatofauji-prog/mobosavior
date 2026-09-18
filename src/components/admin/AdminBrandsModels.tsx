@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../../lib/supabase';
+import { supabase, collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../../lib/supabase';
 import { db } from '../../lib/supabase';
 import { Brand, PhoneModel, ServiceCategory, Service } from '../../types';
 import { DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_CATEGORIES } from '../../data/modelsData';
@@ -37,29 +37,72 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
   const [brandLogoUrl, setBrandLogoUrl] = useState('');
   const [modelImageUrl, setModelImageUrl] = useState('');
 
+  // Saving states
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [savingModel, setSavingModel] = useState(false);
+  const [savingPricing, setSavingPricing] = useState(false);
+
   // Pricing edit state
   const [modelPricesEdit, setModelPricesEdit] = useState<{ [serviceSlug: string]: string }>({});
 
   const services = servicesList.length > 0 ? servicesList : ALL_COMPREHENSIVE_SERVICES;
 
-  // Fetch from firestore
+  // Fetch directly from Supabase
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [brandsSnap, modelsSnap, catsSnap] = await Promise.all([
-        getDocs(query(collection(db, 'brands'), orderBy('displayOrder', 'asc'))),
-        getDocs(query(collection(db, 'models'), orderBy('displayOrder', 'asc'))),
-        getDocs(query(collection(db, 'categories'), orderBy('displayOrder', 'asc'))),
+      const [brandsRes, modelsRes, catsRes] = await Promise.all([
+        supabase.from('brands').select('*').order('display_order', { ascending: true }),
+        supabase.from('models').select('*').order('display_order', { ascending: true }),
+        supabase.from('categories').select('*').order('display_order', { ascending: true })
       ]);
 
-      if (!brandsSnap.empty) {
-        setBrands(brandsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Brand)));
+      if (brandsRes.data && brandsRes.data.length > 0) {
+        setBrands(brandsRes.data.map(b => ({
+          id: b.id,
+          name: b.name,
+          slug: b.slug,
+          logoUrl: b.logo_url || b.logoUrl || '',
+          displayOrder: b.display_order ?? b.displayOrder ?? 1,
+          active: b.is_active ?? b.active ?? true
+        })));
+      } else {
+        const brandsSnap = await getDocs(query(collection(db, 'brands'), orderBy('displayOrder', 'asc')));
+        if (!brandsSnap.empty) setBrands(brandsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Brand)));
       }
-      if (!modelsSnap.empty) {
-        setModels(modelsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PhoneModel)));
+
+      if (modelsRes.data && modelsRes.data.length > 0) {
+        setModels(modelsRes.data.map(m => ({
+          id: m.id,
+          name: m.name,
+          slug: m.slug,
+          brand: m.brand,
+          releaseYear: m.release_year ?? m.releaseYear,
+          imageUrl: m.image_url || m.imageUrl || '',
+          displayOrder: m.display_order ?? m.displayOrder ?? 1,
+          active: m.is_active ?? m.active ?? true,
+          servicePrices: m.service_prices || m.servicePrices || {},
+          availableServices: m.available_services || m.availableServices || []
+        })));
+      } else {
+        const modelsSnap = await getDocs(query(collection(db, 'models'), orderBy('displayOrder', 'asc')));
+        if (!modelsSnap.empty) setModels(modelsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PhoneModel)));
       }
-      if (!catsSnap.empty) {
-        setCategories(catsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceCategory)));
+
+      if (catsRes.data && catsRes.data.length > 0) {
+        setCategories(catsRes.data.map(c => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          description: c.description,
+          longDescription: c.long_description || c.longDescription,
+          imageUrl: c.image_url || c.imageUrl,
+          badge: c.badge,
+          displayOrder: c.display_order ?? c.displayOrder ?? 1,
+          active: c.is_active ?? c.active ?? true,
+          problemsCovered: c.problems_covered || c.problemsCovered || [],
+          serviceSlugs: c.service_slugs || c.serviceSlugs || []
+        })));
       }
     } catch (err) {
       console.error('Error fetching brands/models:', err);
@@ -84,87 +127,220 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
     }
   }, [modelModal.open, modelModal.item]);
 
-  // Save Brand
+  // Save Brand to Supabase
   const handleSaveBrand = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (savingBrand) return;
     const form = e.currentTarget;
     const formData = new FormData(form);
     
-    const id = brandModal.item?.id || `brand_${Date.now()}`;
-    const brandData: Brand = {
-      id,
-      name: formData.get('name') as string,
-      slug: (formData.get('name') as string).toLowerCase().replace(/\s+/g, '-'),
-      logoUrl: brandLogoUrl || (formData.get('logoUrl') as string) || '',
-      displayOrder: parseInt(formData.get('displayOrder') as string) || (brands.length + 1),
-      active: formData.get('active') === 'true',
-    };
+    const rawName = (formData.get('name') as string)?.trim();
+    if (!rawName) {
+      alert('Brand name is required.');
+      return;
+    }
 
+    setSavingBrand(true);
     try {
-      await setDoc(doc(db, 'brands', id), brandData);
+      const isEdit = Boolean(brandModal.item?.id);
+      const id = brandModal.item?.id || `brand_${Date.now()}`;
+      const logo = brandLogoUrl || (formData.get('logoUrl') as string)?.trim() || '';
+      const order = parseInt(formData.get('displayOrder') as string) || (brands.length + 1);
+      const activeVal = formData.get('active') === 'true';
+
+      const payload: any = {
+        name: rawName,
+        slug: rawName.toLowerCase().replace(/\s+/g, '-'),
+        logoUrl: logo,
+        logo_url: logo,
+        displayOrder: order,
+        display_order: order,
+        active: activeVal,
+        is_active: activeVal
+      };
+
+      let savedRecord: any = null;
+
+      if (isEdit) {
+        const { data: updateRes, error } = await supabase
+          .from('brands')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[MOBO ADMIN SAVE ERROR - brands update]:', { table: 'brands', id, error });
+          throw error;
+        }
+        savedRecord = updateRes;
+      } else {
+        payload.id = id;
+        const { data: insertRes, error } = await supabase
+          .from('brands')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[MOBO ADMIN SAVE ERROR - brands insert]:', { table: 'brands', id, error });
+          throw error;
+        }
+        savedRecord = insertRes;
+      }
+
+      const mappedSaved: Brand = {
+        id: savedRecord.id || id,
+        name: savedRecord.name || payload.name,
+        slug: savedRecord.slug || payload.slug,
+        logoUrl: savedRecord.logo_url || savedRecord.logoUrl || logo,
+        displayOrder: savedRecord.display_order ?? savedRecord.displayOrder ?? order,
+        active: savedRecord.is_active ?? savedRecord.active ?? activeVal
+      };
+
+      setBrands(prev => isEdit ? prev.map(b => b.id === id ? mappedSaved : b) : [...prev, mappedSaved]);
       setBrandModal({ open: false });
-      fetchAll();
+      await fetchAll();
       if (onRefreshData) onRefreshData();
-      alert('Brand saved successfully!');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save brand.');
+      alert(`Brand "${mappedSaved.name}" saved successfully!`);
+    } catch (err: any) {
+      console.error('Failed to save brand:', err);
+      alert('Failed to save brand: ' + (err?.message || 'Database error.'));
+    } finally {
+      setSavingBrand(false);
     }
   };
 
-  // Delete Brand
+  // Delete Brand from Supabase
   const handleDeleteBrand = async (id: string) => {
     if (confirm('Are you sure you want to delete this brand?')) {
       try {
-        await deleteDoc(doc(db, 'brands', id));
-        fetchAll();
-      } catch (err) {
-        console.error(err);
+        const { error } = await supabase.from('brands').delete().eq('id', id);
+        if (error) {
+          console.error('[MOBO ADMIN DELETE ERROR - brands]:', error);
+          throw error;
+        }
+        setBrands(prev => prev.filter(b => b.id !== id));
+        await fetchAll();
+        if (onRefreshData) onRefreshData();
+        alert('Brand deleted successfully.');
+      } catch (err: any) {
+        console.error('Error deleting brand:', err);
+        alert('Failed to delete brand: ' + (err?.message || 'Database error.'));
       }
     }
   };
 
-  // Save Model
+  // Save Model to Supabase
   const handleSaveModel = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (savingModel) return;
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    const id = modelModal.item?.id || `model_${Date.now()}`;
-    const modelName = formData.get('name') as string;
-    const modelData: PhoneModel = {
-      id,
-      name: modelName,
-      slug: modelName.toLowerCase().replace(/\s+/g, '-'),
-      brand: formData.get('brand') as string,
-      releaseYear: formData.get('releaseYear') ? parseInt(formData.get('releaseYear') as string) : undefined,
-      imageUrl: modelImageUrl || (formData.get('imageUrl') as string) || '',
-      displayOrder: parseInt(formData.get('displayOrder') as string) || (models.length + 1),
-      active: formData.get('active') === 'true',
-      servicePrices: modelModal.item?.servicePrices || {},
-      availableServices: modelModal.item?.availableServices || []
-    };
+    const modelName = (formData.get('name') as string)?.trim();
+    const brand = (formData.get('brand') as string)?.trim();
+    if (!modelName || !brand) {
+      alert('Both model name and brand are required.');
+      return;
+    }
 
+    setSavingModel(true);
     try {
-      await setDoc(doc(db, 'models', id), modelData);
+      const isEdit = Boolean(modelModal.item?.id);
+      const id = modelModal.item?.id || `model_${Date.now()}`;
+      const img = modelImageUrl || (formData.get('imageUrl') as string)?.trim() || '';
+      const order = parseInt(formData.get('displayOrder') as string) || (models.length + 1);
+      const activeVal = formData.get('active') === 'true';
+      const releaseYr = formData.get('releaseYear') ? parseInt(formData.get('releaseYear') as string) : null;
+
+      const payload: any = {
+        name: modelName,
+        slug: modelName.toLowerCase().replace(/\s+/g, '-'),
+        brand: brand,
+        releaseYear: releaseYr,
+        imageUrl: img,
+        image_url: img,
+        displayOrder: order,
+        display_order: order,
+        active: activeVal,
+        is_active: activeVal
+      };
+
+      let savedRecord: any = null;
+
+      if (isEdit) {
+        const { data: updateRes, error } = await supabase
+          .from('models')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[MOBO ADMIN SAVE ERROR - models update]:', { table: 'models', id, error });
+          throw error;
+        }
+        savedRecord = updateRes;
+      } else {
+        payload.id = id;
+        payload.servicePrices = {};
+        payload.availableServices = [];
+        const { data: insertRes, error } = await supabase
+          .from('models')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[MOBO ADMIN SAVE ERROR - models insert]:', { table: 'models', id, error });
+          throw error;
+        }
+        savedRecord = insertRes;
+      }
+
+      const mappedSaved: PhoneModel = {
+        id: savedRecord.id || id,
+        name: savedRecord.name || payload.name,
+        slug: savedRecord.slug || payload.slug,
+        brand: savedRecord.brand || payload.brand,
+        releaseYear: savedRecord.release_year ?? savedRecord.releaseYear ?? releaseYr,
+        imageUrl: savedRecord.image_url || savedRecord.imageUrl || img,
+        displayOrder: savedRecord.display_order ?? savedRecord.displayOrder ?? order,
+        active: savedRecord.is_active ?? savedRecord.active ?? activeVal,
+        servicePrices: savedRecord.service_prices || savedRecord.servicePrices || modelModal.item?.servicePrices || {},
+        availableServices: savedRecord.available_services || savedRecord.availableServices || modelModal.item?.availableServices || []
+      };
+
+      setModels(prev => isEdit ? prev.map(m => m.id === id ? mappedSaved : m) : [...prev, mappedSaved]);
       setModelModal({ open: false });
-      fetchAll();
+      await fetchAll();
       if (onRefreshData) onRefreshData();
-      alert('Model saved successfully!');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save model.');
+      alert(`Phone model "${mappedSaved.name}" saved successfully!`);
+    } catch (err: any) {
+      console.error('Failed to save model:', err);
+      alert('Failed to save model: ' + (err?.message || 'Database error.'));
+    } finally {
+      setSavingModel(false);
     }
   };
 
-  // Delete Model
+  // Delete Model from Supabase
   const handleDeleteModel = async (id: string) => {
     if (confirm('Are you sure you want to delete this phone model?')) {
       try {
-        await deleteDoc(doc(db, 'models', id));
-        fetchAll();
-      } catch (err) {
-        console.error(err);
+        const { error } = await supabase.from('models').delete().eq('id', id);
+        if (error) {
+          console.error('[MOBO ADMIN DELETE ERROR - models]:', error);
+          throw error;
+        }
+        setModels(prev => prev.filter(m => m.id !== id));
+        await fetchAll();
+        if (onRefreshData) onRefreshData();
+        alert('Model deleted successfully.');
+      } catch (err: any) {
+        console.error('Error deleting model:', err);
+        alert('Failed to delete model: ' + (err?.message || 'Database error.'));
       }
     }
   };
@@ -175,19 +351,37 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
     setPricingModal({ open: true, model });
   };
 
-  // Save Pricing for a Model
+  // Save Pricing for a Model in Supabase
   const handleSavePricing = async () => {
-    if (!pricingModal.model) return;
+    if (!pricingModal.model || savingPricing) return;
+    setSavingPricing(true);
     try {
-      await updateDoc(doc(db, 'models', pricingModal.model.id), {
-        servicePrices: modelPricesEdit
-      });
+      const id = pricingModal.model.id;
+      const { data, error } = await supabase
+        .from('models')
+        .update({
+          servicePrices: modelPricesEdit,
+          service_prices: modelPricesEdit
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[MOBO ADMIN SAVE ERROR - model pricing update]:', { table: 'models', id, error });
+        throw error;
+      }
+
+      setModels(prev => prev.map(m => m.id === id ? { ...m, servicePrices: modelPricesEdit } : m));
       setPricingModal({ open: false });
-      fetchAll();
+      await fetchAll();
+      if (onRefreshData) onRefreshData();
       alert('Model service prices updated successfully!');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to update service prices.');
+    } catch (err: any) {
+      console.error('Failed to update service prices:', err);
+      alert('Failed to update service prices: ' + (err?.message || 'Database error.'));
+    } finally {
+      setSavingPricing(false);
     }
   };
 
@@ -490,16 +684,19 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
+                  disabled={savingBrand}
                   onClick={() => setBrandModal({ open: false })}
-                  className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200"
+                  className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-xl font-bold shadow-sm"
+                  disabled={savingBrand}
+                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-xl font-bold shadow-sm flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save Brand
+                  {savingBrand && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {savingBrand ? 'Saving...' : 'Save Brand'}
                 </button>
               </div>
             </form>
@@ -596,16 +793,19 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
+                  disabled={savingModel}
                   onClick={() => setModelModal({ open: false })}
-                  className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200"
+                  className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-xl font-bold shadow-sm"
+                  disabled={savingModel}
+                  className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-xl font-bold shadow-sm flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save Model
+                  {savingModel && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {savingModel ? 'Saving...' : 'Save Model'}
                 </button>
               </div>
             </form>
@@ -677,17 +877,20 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
               <div className="flex gap-2">
                 <button
                   type="button"
+                  disabled={savingPricing}
                   onClick={() => setPricingModal({ open: false })}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 text-xs"
+                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 text-xs disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
+                  disabled={savingPricing}
                   onClick={handleSavePricing}
-                  className="px-5 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-xl font-bold shadow-sm text-xs flex items-center gap-1.5"
+                  className="px-5 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white rounded-xl font-bold shadow-sm text-xs flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <Save className="w-4 h-4" /> Save Prices
+                  {savingPricing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {savingPricing ? 'Saving...' : 'Save Prices'}
                 </button>
               </div>
             </div>

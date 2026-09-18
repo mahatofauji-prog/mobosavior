@@ -67,68 +67,7 @@ export default function AdminGalleryManager() {
     fetchData();
   }, []);
 
-  // Auto-extract thumbnail whenever videoUrl changes in 'url' mode
-  useEffect(() => {
-    if (mediaType === 'video' && videoUploadMode === 'url' && videoUrl.trim()) {
-      // If we are editing an item and the videoUrl hasn't changed or we already have a stored thumbnail, keep it unless custom changed
-      if (editingItem && editingItem.videoUrl === videoUrl.trim() && (editingItem.thumbnailUrl || editingItem.thumbnail_url || editingItem.imageUrl)) {
-        return;
-      }
-
-      const parsed = parseVideoUrl(videoUrl);
-      if (parsed && parsed.isValid) {
-        if (parsed.platform === 'youtube' && parsed.youtubeId) {
-          setExtractedThumbnailUrl(`https://img.youtube.com/vi/${parsed.youtubeId}/hqdefault.jpg`);
-          setExtractedThumbnailBlob(null);
-          return;
-        }
-
-        // If direct video link, extract frame directly in browser
-        if (parsed.platform === 'direct' || isDirectVideoUrl(videoUrl)) {
-          setExtractingMetadata(true);
-          extractFrameFromVideoUrl(videoUrl.trim(), frameTimestamp)
-            .then(res => {
-              setExtractedThumbnailUrl(res.dataUrl);
-              setExtractedThumbnailBlob(res.blob);
-            })
-            .catch(err => {
-              console.warn('Direct video frame extraction error:', err);
-            })
-            .finally(() => {
-              setExtractingMetadata(false);
-            });
-          return;
-        }
-
-        // For Instagram / Facebook, query backend metadata
-        setExtractingMetadata(true);
-        const controller = new AbortController();
-        fetch('/api/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: videoUrl.trim() }),
-          signal: controller.signal
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && data.thumbnailUrl) {
-              setExtractedThumbnailUrl(data.thumbnailUrl);
-              setExtractedThumbnailBlob(null);
-            }
-          })
-          .catch(err => {
-            if (err.name !== 'AbortError') {
-              console.warn('Metadata extraction error:', err);
-            }
-          })
-          .finally(() => {
-            setExtractingMetadata(false);
-          });
-
-        return () => controller.abort();
-      }
-    }
-  }, [videoUrl, mediaType, videoUploadMode, frameTimestamp]);
+  // Auto-extraction disabled per user request: only admin uploaded custom thumbnail is used
 
   // Handle direct video file selection
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,39 +281,13 @@ export default function AdminGalleryManager() {
           return;
         }
 
-        // Upload custom thumbnail file or extracted canvas frame blob
+        // Only use custom thumbnail file uploaded via Admin portal or existing editing item thumbnail
         if (customThumbnailFile) {
           officialThumbnailUrl = await uploadFileToStorage(customThumbnailFile, 'thumbnails');
-        } else if (extractedThumbnailBlob) {
-          const thumbFile = blobToFile(extractedThumbnailBlob, `thumb_${Date.now()}.jpg`);
-          officialThumbnailUrl = await uploadFileToStorage(thumbFile, 'thumbnails');
-        } else if (extractedThumbnailUrl && extractedThumbnailUrl.startsWith('data:')) {
-          try {
-            const blobRes = await fetch(extractedThumbnailUrl);
-            const blobData = await blobRes.blob();
-            const thumbFile = blobToFile(blobData, `thumb_${Date.now()}.jpg`);
-            officialThumbnailUrl = await uploadFileToStorage(thumbFile, 'thumbnails');
-          } catch (e) {
-            console.warn('Failed to upload dataURL thumbnail:', e);
-            officialThumbnailUrl = extractedThumbnailUrl;
-          }
-        } else if (extractedThumbnailUrl) {
-          officialThumbnailUrl = extractedThumbnailUrl;
-        } else if (parsedVideo?.defaultThumbnail) {
-          officialThumbnailUrl = parsedVideo.defaultThumbnail;
+        } else if (editingItem) {
+          officialThumbnailUrl = editingItem.imageUrl || editingItem.thumbnailUrl || editingItem.thumbnail_url || null;
         } else {
-          // Auto-generate branded high-res video poster as fallback
-          try {
-            const poster = await generateBrandedVideoPoster(
-              title || 'Repair Video',
-              videoPlatform || 'video',
-              getCategoryLabel(category) || 'Micro-Soldering'
-            );
-            const posterFile = blobToFile(poster.blob, `poster_${Date.now()}.jpg`);
-            officialThumbnailUrl = await uploadFileToStorage(posterFile, 'thumbnails');
-          } catch (pErr) {
-            console.warn('Poster generation fallback failed:', pErr);
-          }
+          officialThumbnailUrl = null;
         }
       }
 

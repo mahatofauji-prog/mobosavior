@@ -115,18 +115,11 @@ export function getOfficialVideoThumbnail(
   videoUrl: string | undefined | null,
   storedThumbnail?: string | null
 ): string | null {
-  // If a stored thumbnail is provided and non-empty, use it immediately
+  // Only use stored/uploaded thumbnail from Admin portal
   if (storedThumbnail && typeof storedThumbnail === 'string') {
     const trimmed = storedThumbnail.trim();
     if (trimmed.length > 5) {
       return trimmed;
-    }
-  }
-
-  if (videoUrl) {
-    const parsed = parseVideoUrl(videoUrl);
-    if (parsed?.platform === 'youtube' && parsed.youtubeId) {
-      return `https://img.youtube.com/vi/${parsed.youtubeId}/hqdefault.jpg`;
     }
   }
 

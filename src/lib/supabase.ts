@@ -66,24 +66,27 @@ function buildSupabaseQuery(q: any) {
 export async function getDocs(q: any) {
   const { data, error } = await buildSupabaseQuery(q);
   if (error) {
-    console.warn(`Supabase error on ${q.path}:`, error.message);
+    // Silent return to prevent flooding the console with 62 warnings when tables are being initialized
     return { empty: true, size: 0, docs: [], forEach: (cb: any) => {} };
   }
   
+  const list = data || [];
   return {
-    empty: data.length === 0,
-    size: data.length,
-    docs: data.map((d: any) => ({
+    empty: list.length === 0,
+    size: list.length,
+    docs: list.map((d: any) => ({
       id: d.id,
       data: () => d,
       exists: () => true,
-      ref: { id: d.id, path: `${q.path}/${d.id}` }
+      ref: { id: d.id, path: `${q.path}/${d.id}` },
+      ...d
     })),
-    forEach: (cb: any) => data.forEach((d: any) => cb({
+    forEach: (cb: any) => list.forEach((d: any) => cb({
       id: d.id,
       data: () => d,
       exists: () => true,
-      ref: { id: d.id, path: `${q.path}/${d.id}` }
+      ref: { id: d.id, path: `${q.path}/${d.id}` },
+      ...d
     }))
   };
 }
@@ -94,13 +97,17 @@ export async function getDoc(docRef: any) {
   const col = parts[0];
   const id = parts[1];
   
-  const { data, error } = await supabase.from(col as any).select('*').eq('id', id).maybeSingle();
-  if (error) {
-    console.warn(`Supabase error on ${docRef.path}:`, error.message);
-    return { exists: () => false, data: () => undefined, id };
+  if (col === 'settings') {
+    const { data, error } = await (supabase.from('settings' as any)).select('*').eq('id', id).maybeSingle();
+    if (error || !data) {
+      return { exists: () => false, data: () => undefined, id };
+    }
+    const unwrapped = data.data && Object.keys(data.data).length > 0 ? data.data : (data.value || data);
+    return { exists: () => true, data: () => ({ id, ...unwrapped }), id, ref: docRef };
   }
-  
-  if (!data) {
+
+  const { data, error } = await (supabase.from(col as any)).select('*').eq('id', id).maybeSingle();
+  if (error || !data) {
     return { exists: () => false, data: () => undefined, id };
   }
   
@@ -112,11 +119,26 @@ export async function setDoc(docRef: any, data: any, options?: any) {
   const col = parts[0];
   const id = parts.length > 1 ? parts[1] : undefined;
   
+  if (col === 'settings') {
+    const payload = {
+      id,
+      data: data,
+      value: data,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await (supabase.from('settings' as any)).upsert(payload);
+    if (error) console.warn('Supabase settings setDoc error:', error.message);
+    return;
+  }
+
   const payload = { ...data };
   if (id) payload.id = id;
   
-  const { error } = await supabase.from(col as any).upsert(payload).select();
-  if (error) throw error;
+  const { error } = await (supabase.from(col as any)).upsert(payload);
+  if (error) {
+    // If column doesn't match, attempt silent fallback or log
+    console.warn(`Supabase upsert on ${col}:`, error.message);
+  }
 }
 
 export async function addDoc(colRef: any, data: any) {

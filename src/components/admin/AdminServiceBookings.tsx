@@ -20,8 +20,32 @@ export default function AdminServiceBookings() {
     const q = query(collection(db, 'service_bookings'), orderBy('created_at', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const bData: ServiceBooking[] = [];
+      const seenIds = new Set<string>();
       snapshot.forEach((doc) => {
-        bData.push(doc.data() as ServiceBooking);
+        const d = doc.data() as any;
+        const sId = d.service_id || d.serviceId || d.id;
+        if (sId && !seenIds.has(sId)) {
+          seenIds.add(sId);
+          bData.push({
+            id: d.id || sId,
+            service_id: sId,
+            customer_name: d.customer_name || d.customerName || 'Customer',
+            address: d.address || '',
+            pin_code: d.pin_code || d.pinCode || '',
+            contact_number: d.contact_number || d.phone || '',
+            whatsapp_number: d.whatsapp_number || d.whatsapp || d.contact_number || d.phone || '',
+            mobile_brand: d.mobile_brand || d.brand || '',
+            mobile_model: d.mobile_model || d.model || '',
+            problem: d.problem || d.problemDescription || '',
+            preferred_date: d.preferred_date || d.preferredDate || '',
+            preferred_time: d.preferred_time || d.preferredTime || '',
+            front_image_url: d.front_image_url || d.frontImageUrl || '',
+            back_image_url: d.back_image_url || d.backImageUrl || '',
+            status: d.status || 'Booking Received',
+            created_at: d.created_at || d.createdAt || new Date().toISOString(),
+            updated_at: d.updated_at || new Date().toISOString()
+          });
+        }
       });
       setBookings(bData);
       setLoading(false);
@@ -33,13 +57,13 @@ export default function AdminServiceBookings() {
   }, []);
 
   const filteredBookings = bookings.filter(b => 
-    b.service_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.contact_number.includes(searchTerm) ||
-    b.whatsapp_number.includes(searchTerm) ||
-    b.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.mobile_brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.mobile_model.toLowerCase().includes(searchTerm.toLowerCase())
+    (b.service_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (b.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (b.contact_number || '').includes(searchTerm) ||
+    (b.whatsapp_number || '').includes(searchTerm) ||
+    (b.status || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (b.mobile_brand || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (b.mobile_model || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const statuses = [
@@ -70,6 +94,13 @@ export default function AdminServiceBookings() {
       batch.update(publicRef, {
         status: newStatus,
         last_updated: new Date().toISOString()
+      });
+
+      // Update general bookings collection
+      const generalRef = doc(db, 'bookings', selectedBooking.service_id);
+      batch.update(generalRef, {
+        status: newStatus === 'Booking Received' ? 'Pending' : (newStatus === 'Repairing' || newStatus === 'Diagnosis' ? 'In Progress' : (newStatus === 'Delivered' ? 'Completed' : newStatus)),
+        updated_at: new Date().toISOString()
       });
 
       await batch.commit();

@@ -189,6 +189,36 @@ export default function BookingForm({
         last_updated: new Date().toISOString()
       });
 
+      // General Bookings Collection (For Admin Dashboard stats, counter & pending list)
+      const generalDocRef = doc(db, 'bookings', serviceId);
+      batch.set(generalDocRef, {
+        id: serviceId,
+        serviceId: serviceId,
+        service_id: serviceId,
+        serviceName: problem || 'Mobile Device Repair',
+        service_name: problem || 'Mobile Device Repair',
+        brand: mobileBrand,
+        model: mobileModel,
+        problemDescription: problem,
+        problem_description: problem,
+        customerName: customerName,
+        customer_name: customerName,
+        phone: contactNumber,
+        whatsapp: whatsappNumber,
+        address,
+        pinCode,
+        pin_code: pinCode,
+        preferredDate,
+        preferred_date: preferredDate,
+        preferredTime,
+        preferred_time: preferredTime,
+        status: 'Pending',
+        frontImageUrl,
+        backImageUrl,
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+
       // Commit with a timeout to prevent hanging if offline
       await Promise.race([
         batch.commit(),

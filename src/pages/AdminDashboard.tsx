@@ -169,16 +169,60 @@ export default function AdminDashboard({
     }
   }, [slideModal.open, slideModal.item]);
 
-  // Load Bookings directly
+  // Load Bookings directly from service_bookings and bookings tables
   const fetchBookings = async () => {
     setLoadingBookings(true);
     try {
-      const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
       const fetched: Booking[] = [];
-      snapshot.forEach((doc) => {
-        fetched.push({ ...doc.data() } as Booking);
-      });
+      const seenIds = new Set<string>();
+
+      // 1. Fetch from service_bookings (where repairs are submitted)
+      try {
+        const sbQ = query(collection(db, 'service_bookings'), orderBy('created_at', 'desc'));
+        const sbSnapshot = await getDocs(sbQ);
+        sbSnapshot.forEach((doc) => {
+          const d = doc.data() as any;
+          const id = d.service_id || d.id;
+          if (id && !seenIds.has(id)) {
+            seenIds.add(id);
+            fetched.push({
+              id,
+              serviceId: id,
+              serviceName: d.problem || 'Device Repair',
+              brand: d.mobile_brand || '',
+              model: d.mobile_model || '',
+              problemDescription: d.problem || '',
+              customerName: d.customer_name || 'Customer',
+              phone: d.contact_number || '',
+              whatsapp: d.whatsapp_number || d.contact_number || '',
+              address: d.address || '',
+              preferredDate: d.preferred_date || '',
+              preferredTime: d.preferred_time || '',
+              status: (d.status === 'Booking Received' ? 'Pending' : d.status) as any,
+              createdAt: d.created_at || new Date().toISOString()
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('Could not fetch from service_bookings:', e);
+      }
+
+      // 2. Fetch from bookings table
+      try {
+        const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        snapshot.forEach((doc) => {
+          const d = doc.data() as any;
+          const id = d.serviceId || d.id;
+          if (id && !seenIds.has(id)) {
+            seenIds.add(id);
+            fetched.push({ ...d } as Booking);
+          }
+        });
+      } catch (e) {
+        console.warn('Could not fetch from bookings:', e);
+      }
+
       setBookings(fetched);
     } catch (err) {
       console.error('Error fetching bookings:', err);

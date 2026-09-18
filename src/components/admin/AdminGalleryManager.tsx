@@ -381,26 +381,16 @@ export default function AdminGalleryManager() {
       const itemId = editingItem ? editingItem.id : `gal-${Date.now()}`;
       const finalCategoryId = mapCategoryToId(category) || (mediaType === 'video' ? 'repairing_videos' : 'repairing');
 
-      // Build safe base payload with guaranteed database columns
-      const baseGalleryPayload: any = {
+      // Build safe clean payload with standard database columns only
+      const galleryPayload: any = {
         id: itemId,
         title: title || (mediaType === 'video' ? 'Repair Video' : 'Repair Gallery Item'),
         description: description || '',
         category: finalCategoryId,
-        mediaType: mediaType || 'image',
         imageUrl: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
         image_url: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
-        thumbnailUrl: mediaType === 'video' ? officialThumbnailUrl : null,
-        thumbnail_url: mediaType === 'video' ? officialThumbnailUrl : null,
         videoUrl: finalVideoUrl || null,
         video_url: finalVideoUrl || null,
-        videoPlatform: videoPlatform || null,
-        video_platform: videoPlatform || null,
-        youtubeVideoId: youtubeVideoId || null,
-        youtube_video_id: youtubeVideoId || null,
-        beforeImageUrl: finalBeforeUrl || null,
-        afterImageUrl: finalAfterUrl || null,
-        altText: [brand, model, title].filter(Boolean).join(' - ') || null,
         featured: !!featured,
         active: active !== false,
         is_active: active !== false,
@@ -410,30 +400,13 @@ export default function AdminGalleryManager() {
         created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
-      // Extended payload including brand/model/serviceSlug if present in database schema
-      const extendedGalleryPayload: any = {
-        ...baseGalleryPayload,
-        serviceSlug: serviceSlug || null,
-        service_slug: serviceSlug || null,
-        brand: brand || null,
-        model: model || null
-      };
-
       let saveErr = null;
-      const firstAttempt = await supabase.from('gallery').upsert(extendedGalleryPayload);
-      if (firstAttempt.error) {
-        if (firstAttempt.error.code === 'PGRST204' || firstAttempt.error.message.includes('column') || firstAttempt.error.message.includes('schema cache')) {
-          console.warn('[Supabase Gallery]: Extended columns not yet migrated in database, saving base schema with altText metadata...', firstAttempt.error.message);
-          const secondAttempt = await supabase.from('gallery').upsert(baseGalleryPayload);
-          saveErr = secondAttempt.error;
-        } else {
-          saveErr = firstAttempt.error;
-        }
-      }
+      const { error: gErr } = await supabase.from('gallery').upsert(galleryPayload);
+      saveErr = gErr;
 
       if (saveErr) {
         console.error('[GALLERY SAVE ERROR]', {
-          payload: baseGalleryPayload,
+          payload: galleryPayload,
           message: saveErr.message,
           code: saveErr.code,
           details: saveErr.details,
@@ -442,7 +415,7 @@ export default function AdminGalleryManager() {
         throw saveErr;
       }
 
-      // If it's a video, also sync to videos table (which supports brand, model, serviceSlug)
+      // If it's a video, also sync to videos table
       if (mediaType === 'video' && finalVideoUrl) {
         const videoPayload = {
           id: itemId,
@@ -451,9 +424,6 @@ export default function AdminGalleryManager() {
           category: finalCategoryId,
           videoUrl: finalVideoUrl,
           video_url: finalVideoUrl,
-          videoPlatform: videoPlatform || null,
-          thumbnailUrl: officialThumbnailUrl,
-          thumbnail_url: officialThumbnailUrl,
           imageUrl: officialThumbnailUrl,
           image_url: officialThumbnailUrl,
           featured: !!featured,
@@ -461,11 +431,8 @@ export default function AdminGalleryManager() {
           is_active: active !== false,
           displayOrder: Number(displayOrder) || 1,
           display_order: Number(displayOrder) || 1,
-          createdAt: baseGalleryPayload.createdAt,
-          created_at: baseGalleryPayload.created_at,
-          serviceSlug: serviceSlug || null,
-          brand: brand || null,
-          model: model || null
+          createdAt: galleryPayload.createdAt,
+          created_at: galleryPayload.created_at
         };
         const { error: vErr } = await supabase.from('videos').upsert(videoPayload);
         if (vErr) console.warn('[Supabase Sync Video Warning]:', vErr);

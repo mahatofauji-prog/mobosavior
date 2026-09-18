@@ -111,16 +111,21 @@ export default function VideoThumbnail({
     );
   }
 
-  // 3. Instagram / Facebook / Social Video Card
+  // 3. Instagram / Facebook / Social Video Card with Thumbnail / Poster support
+  const bgPoster = thumbnailUrl || (parsed?.platform === 'instagram' ? 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=800&auto=format&fit=crop' : 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=800&auto=format&fit=crop');
+
   return (
-    <div className={`relative ${aspectClass} overflow-hidden flex flex-col items-center justify-center text-center p-4 select-none group ${
-      parsed?.platform === 'instagram'
-        ? 'bg-gradient-to-br from-purple-950 via-slate-950 to-pink-950 border border-purple-900/40'
-        : parsed?.platform === 'facebook'
-        ? 'bg-gradient-to-br from-blue-950 via-slate-950 to-indigo-950 border border-blue-900/40'
-        : 'bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-slate-800'
-    } ${className}`}>
+    <div className={`relative ${aspectClass} overflow-hidden flex flex-col items-center justify-center text-center p-4 select-none group bg-slate-950 ${className}`}>
       
+      {/* Background Image / Poster */}
+      <img
+        src={bgPoster}
+        alt={title}
+        className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-500"
+        referrerPolicy="no-referrer"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20 pointer-events-none" />
+
       {/* Platform Badge */}
       <span
         className={`absolute top-2.5 left-2.5 px-2.5 py-0.5 text-white font-black text-[9px] uppercase tracking-wider rounded-md shadow-md flex items-center gap-1 z-10 ${
@@ -138,7 +143,7 @@ export default function VideoThumbnail({
       </span>
 
       {/* Center Action */}
-      <div className="flex flex-col items-center justify-center space-y-2.5 z-10 max-w-[240px]">
+      <div className="flex flex-col items-center justify-center space-y-2 z-10 max-w-[240px]">
         <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform ${
           parsed?.platform === 'instagram'
             ? 'bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white'
@@ -149,16 +154,11 @@ export default function VideoThumbnail({
           <Play className="w-5 h-5 fill-current ml-0.5" />
         </div>
 
-        <span className="text-xs font-black text-white tracking-wide uppercase line-clamp-1">
+        <span className="text-xs font-black text-white tracking-wide uppercase line-drop-shadow line-clamp-1">
           {title || `${platformLabel} Video`}
-        </span>
-        <span className="text-[10px] text-slate-300 font-medium leading-tight">
-          Click to watch {platformLabel} demonstration
         </span>
       </div>
 
-      {/* Background ambient lighting */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.1)_0,transparent_70%)] pointer-events-none" />
     </div>
   );
 }

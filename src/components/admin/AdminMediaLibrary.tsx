@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../../lib/storageUpload';
 import { MediaItem } from '../../types';
 import { Plus, Trash2, Loader2, Image as ImageIcon, Copy, Check, UploadCloud, Search } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../lib/errors';
 
 export default function AdminMediaLibrary() {
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -21,16 +19,18 @@ export default function AdminMediaLibrary() {
   const fetchMedia = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'media_library'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const fetched: MediaItem[] = [];
-      snapshot.forEach(docSnap => {
-        fetched.push({ id: docSnap.id, ...docSnap.data() } as MediaItem);
-      });
-      setItems(fetched);
+      const { data, error: fetchErr } = await supabase
+        .from('media_library')
+        .select('*')
+        .order('createdAt', { ascending: false });
+
+      if (fetchErr) {
+        console.error('Error fetching media_library:', fetchErr);
+      } else if (data) {
+        setItems(data as MediaItem[]);
+      }
     } catch (err) {
       console.error(err);
-      handleFirestoreError(err, OperationType.GET, 'media_library');
     } finally {
       setLoading(false);
     }
@@ -55,25 +55,28 @@ export default function AdminMediaLibrary() {
     const mediaId = `media-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 
     try {
-      // 1. Upload to Storage
+      // 1. Upload to Supabase Storage
       const res = await uploadMediaFile(file, { folder: 'media' });
       if (!res.success || !res.url) {
         throw new Error(res.error || 'Upload failed');
       }
 
-      // 2. Insert index record in Firestore
-      const payload: MediaItem = {
+      // 2. Insert index record in Supabase
+      const payload: any = {
         id: mediaId,
         name: file.name,
         url: res.url,
         type: 'image',
         size: file.size,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'media_library', mediaId), payload);
+      const { error: insertErr } = await supabase.from('media_library').upsert(payload);
+      if (insertErr) throw insertErr;
+
       setSuccess('Image uploaded to media library!');
-      fetchMedia();
+      await fetchMedia();
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Upload failed.');
@@ -119,12 +122,14 @@ export default function AdminMediaLibrary() {
       }
 
       // 2. Delete index doc
-      await deleteDoc(doc(db, 'media_library', item.id));
+      const { error: delErr } = await supabase.from('media_library').delete().eq('id', item.id);
+      if (delErr) throw delErr;
+
       setSuccess('Asset deleted!');
-      fetchMedia();
-    } catch (err) {
+      await fetchMedia();
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to delete asset.');
+      setError('Failed to delete asset: ' + (err?.message || 'Database error'));
     }
   };
 

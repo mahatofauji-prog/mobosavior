@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { BlogPost, BlogCategory } from '../../types';
 import { 
   Plus, Edit, Trash2, Save, X, Eye, FileText, Calendar, User, Tag, 
   Settings, Loader2, Sparkles, Image as ImageIcon, Search, CheckSquare 
 } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../lib/errors';
 import ImageUploader from './ImageUploader';
 
 interface AdminBlogProps {
@@ -55,28 +53,33 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
     setLoading(true);
     try {
       // Load Posts
-      const postsQ = query(collection(db, 'blog_posts'), orderBy('publishDate', 'desc'));
-      const postsSnap = await getDocs(postsQ);
-      const fetchedPosts: BlogPost[] = [];
-      postsSnap.forEach(docSnap => {
-        fetchedPosts.push({ id: docSnap.id, ...docSnap.data() } as BlogPost);
-      });
-      setPosts(fetchedPosts);
+      const { data: postsData, error: postsErr } = await supabase
+        .from('blog_posts')
+        .select('*')
+        .order('publishDate', { ascending: false });
+
+      if (postsErr) {
+        console.error('[Supabase Blog Posts fetch error]:', postsErr);
+      } else if (postsData) {
+        setPosts(postsData as BlogPost[]);
+      }
 
       // Load Categories
-      const catsQ = query(collection(db, 'blog_categories'), orderBy('displayOrder', 'asc'));
-      const catsSnap = await getDocs(catsQ);
-      const fetchedCats: BlogCategory[] = [];
-      catsSnap.forEach(docSnap => {
-        fetchedCats.push({ id: docSnap.id, ...docSnap.data() } as BlogCategory);
-      });
-      setCategories(fetchedCats);
-      if (fetchedCats.length > 0 && !category) {
-        setCategory(fetchedCats[0].name);
+      const { data: catsData, error: catsErr } = await supabase
+        .from('blog_categories')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+
+      if (catsErr) {
+        console.error('[Supabase Blog Cats fetch error]:', catsErr);
+      } else if (catsData) {
+        setCategories(catsData as BlogCategory[]);
+        if (catsData.length > 0 && !category) {
+          setCategory(catsData[0].name);
+        }
       }
     } catch (err) {
       console.error('Error fetching blog data:', err);
-      handleFirestoreError(err, OperationType.GET, 'blog_posts');
     } finally {
       setLoading(false);
     }
@@ -141,13 +144,15 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you absolutely sure you want to delete this blog post?')) return;
     try {
-      await deleteDoc(doc(db, 'blog_posts', id));
+      const { error: delErr } = await supabase.from('blog_posts').delete().eq('id', id);
+      if (delErr) throw delErr;
       setSuccess('Post deleted successfully!');
       fetchData();
       if (onRefreshData) onRefreshData();
-    } catch (err) {
+      alert('Blog post deleted successfully.');
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to delete blog post.');
+      setError('Failed to delete blog post: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -158,20 +163,22 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
     
     try {
       const catId = `blogcat-${Date.now()}`;
-      const payload: BlogCategory = {
+      const payload: any = {
         id: catId,
-        name: newCatName,
+        name: newCatName.trim(),
         slug: newCatName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        displayOrder: categories.length + 1
+        displayOrder: categories.length + 1,
+        display_order: categories.length + 1
       };
-      await setDoc(doc(db, 'blog_categories', catId), payload);
+      const { error: catErr } = await supabase.from('blog_categories').upsert(payload);
+      if (catErr) throw catErr;
       setNewCatName('');
       setCatModalOpen(false);
       setSuccess('Blog category added!');
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to save category.');
+      setError('Failed to save category: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -216,34 +223,50 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
       .map(t => t.trim().toLowerCase())
       .filter(t => t.length > 0);
 
-    const payload: BlogPost = {
+    const payload: any = {
       id: postId,
       title,
       slug: slug.toLowerCase().replace(/[^a-z0-9\-]+/g, '-'),
       content,
-      featuredImage: featuredImage || undefined,
+      featuredImage: featuredImage || null,
+      featured_image: featuredImage || null,
       authorName,
+      author_name: authorName,
       category,
       tags: parsedTags,
       publishDate,
+      publish_date: publishDate,
       status,
       displayOrder: Number(displayOrder) || 0,
-      seoTitle: seoTitle || undefined,
-      metaDescription: metaDescription || undefined,
-      ogImageUrl: ogImageUrl || featuredImage || undefined,
+      display_order: Number(displayOrder) || 0,
+      seoTitle: seoTitle || null,
+      seo_title: seoTitle || null,
+      metaDescription: metaDescription || null,
+      meta_description: metaDescription || null,
+      ogImageUrl: ogImageUrl || featuredImage || null,
+      og_image_url: ogImageUrl || featuredImage || null,
       createdAt: editingPost?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      created_at: editingPost?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     try {
-      await setDoc(doc(db, 'blog_posts', postId), payload);
+      const { error: upsertErr } = await supabase.from('blog_posts').upsert(payload);
+      if (upsertErr) {
+        console.error('[Supabase Blog Post Save Error]:', upsertErr);
+        throw upsertErr;
+      }
+
       setSuccess('Blog post compiled and saved successfully!');
       setEditorOpen(false);
-      fetchData();
+      await fetchData();
       if (onRefreshData) onRefreshData();
-    } catch (err) {
+      alert('Blog post saved successfully!');
+    } catch (err: any) {
       console.error('Error saving post:', err);
-      setError('Failed to write blog post.');
+      setError('Failed to write blog post: ' + (err?.message || 'Database error'));
+      alert('Failed to save blog post: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -645,7 +668,7 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
                       type="button"
                       onClick={async () => {
                         if (window.confirm('Delete category?')) {
-                          await deleteDoc(doc(db, 'blog_categories', c.id));
+                          await supabase.from('blog_categories').delete().eq('id', c.id);
                           fetchData();
                         }
                       }}

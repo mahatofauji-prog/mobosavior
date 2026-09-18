@@ -1,6 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { TrustPoint } from '../../types';
 import { renderTrustIcon, POPULAR_TRUST_ICONS } from '../../utils/offerHelpers';
 import { DEFAULT_TRUST_POINTS } from '../../lib/seed';
@@ -67,10 +66,14 @@ export default function AdminTrustSection() {
 
   async function fetchConfig() {
     try {
-      const configDocRef = doc(db, 'settings', 'trust_config');
-      const configSnap = await getDoc(configDocRef);
-      if (configSnap.exists()) {
-        const data = configSnap.data();
+      const { data: configRow, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'trust_config')
+        .maybeSingle();
+
+      if (!error && configRow) {
+        const data = configRow.data || configRow.value || configRow;
         setConfigState({
           sectionHeading: data.sectionHeading || 'WHY CHOOSE MOBO SAVIOR?',
           sectionLabel: data.sectionLabel || 'THE MOBO SAVIOR ADVANTAGE',
@@ -96,12 +99,16 @@ export default function AdminTrustSection() {
   async function fetchTrustPoints() {
     setLoading(true);
     try {
-      const q = query(collection(db, 'trust_points'), orderBy('displayOrder', 'asc'));
-      const snap = await getDocs(q);
-      const fetched: TrustPoint[] = [];
-      snap.forEach(docSnap => {
-        fetched.push({ id: docSnap.id, ...docSnap.data() } as TrustPoint);
-      });
+      const { data: fetchedRows, error } = await supabase
+        .from('trust_points')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+
+      if (error) {
+        console.error('[Supabase Trust Points Fetch Error]:', error);
+      }
+
+      const fetched = (fetchedRows || []) as TrustPoint[];
       if (fetched.length > 0) {
         const missingDefaults = DEFAULT_TRUST_POINTS.filter(
           def => !fetched.some(f => f.id === def.id || f.title.toLowerCase() === def.title.toLowerCase())
@@ -152,25 +159,36 @@ export default function AdminTrustSection() {
 
     try {
       const id = editingPoint ? editingPoint.id : `tp-${Date.now()}`;
-      const data: TrustPoint = {
+      const payload: any = {
         id,
         title: formState.title.trim(),
         description: formState.description.trim(),
         icon: formState.icon,
-        imageUrl: formState.imageUrl.trim(),
-        isFeatured: formState.isFeatured,
-        isActive: formState.isActive,
-        displayOrder: Number(formState.displayOrder) || 1
+        imageUrl: formState.imageUrl.trim() || null,
+        image_url: formState.imageUrl.trim() || null,
+        isFeatured: !!formState.isFeatured,
+        isActive: formState.isActive !== false,
+        is_active: formState.isActive !== false,
+        displayOrder: Number(formState.displayOrder) || 1,
+        display_order: Number(formState.displayOrder) || 1,
+        createdAt: editingPoint ? (editingPoint as any).createdAt : new Date().toISOString(),
+        created_at: editingPoint ? ((editingPoint as any).createdAt || new Date().toISOString()) : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'trust_points', id), data);
+      const { error } = await supabase.from('trust_points').upsert(payload);
+      if (error) {
+        console.error('[Supabase Trust Point Save Error]:', error);
+        throw error;
+      }
 
       setIsModalOpen(false);
-      fetchTrustPoints();
+      await fetchTrustPoints();
       alert(`Trust point ${editingPoint ? 'updated' : 'created'} successfully!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving trust point:', err);
-      alert('Failed to save trust point.');
+      alert('Failed to save trust point: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -200,11 +218,19 @@ export default function AdminTrustSection() {
         statCustomerReviews: configState.statCustomerReviews.trim()
       };
 
-      await setDoc(doc(db, 'settings', 'trust_config'), dataToSave);
+      const { error } = await supabase.from('settings').upsert({
+        id: 'trust_config',
+        data: dataToSave,
+        value: dataToSave,
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+
       alert('Global section content configuration saved successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving global section content config:', err);
-      alert('Failed to save configuration settings.');
+      alert('Failed to save configuration settings: ' + (err?.message || 'Database error'));
     } finally {
       setSavingConfig(false);
     }
@@ -213,19 +239,25 @@ export default function AdminTrustSection() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this trust point?')) return;
     try {
-      await deleteDoc(doc(db, 'trust_points', id));
-      fetchTrustPoints();
-    } catch (err) {
+      const { error } = await supabase.from('trust_points').delete().eq('id', id);
+      if (error) throw error;
+      await fetchTrustPoints();
+      alert('Trust point deleted successfully.');
+    } catch (err: any) {
       console.error('Error deleting trust point:', err);
+      alert('Failed to delete trust point: ' + (err?.message || 'Database error'));
     }
   };
 
   const handleToggleActive = async (tp: TrustPoint) => {
     try {
-      await updateDoc(doc(db, 'trust_points', tp.id), {
-        isActive: !tp.isActive
-      });
-      fetchTrustPoints();
+      const newActive = !tp.isActive;
+      const { error } = await supabase
+        .from('trust_points')
+        .update({ isActive: newActive, is_active: newActive })
+        .eq('id', tp.id);
+      if (error) throw error;
+      await fetchTrustPoints();
     } catch (err) {
       console.error('Error toggling active state:', err);
     }

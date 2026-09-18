@@ -1,6 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Branch, Service, WeeklyBusinessHours, DayBusinessHours } from '../../types';
 import { DEFAULT_BRANCHES } from '../../lib/seed';
 import { isOpenNow } from '../../utils/branchHelpers';
@@ -88,26 +87,28 @@ export default function AdminBranches() {
     setLoading(true);
     try {
       // Fetch branches
-      const branchSnap = await getDocs(query(collection(db, 'branches'), orderBy('displayOrder', 'asc')));
-      const fetchedBranches: Branch[] = [];
-      branchSnap.forEach((docSnap) => {
-        fetchedBranches.push({ id: docSnap.id, ...docSnap.data() } as Branch);
-      });
+      const { data: branchData, error: branchErr } = await supabase
+        .from('branches')
+        .select('*')
+        .order('displayOrder', { ascending: true });
 
-      if (fetchedBranches.length === 0) {
-        setBranches(DEFAULT_BRANCHES);
+      if (branchErr) {
+        console.error('Error fetching branches:', branchErr);
+      } else if (branchData && branchData.length > 0) {
+        setBranches(branchData as Branch[]);
       } else {
-        setBranches(fetchedBranches);
+        setBranches(DEFAULT_BRANCHES);
       }
 
       // Fetch services for assignment
-      const serviceSnap = await getDocs(query(collection(db, 'services'), orderBy('displayOrder', 'asc')));
-      const fetchedServices: Service[] = [];
-      serviceSnap.forEach((docSnap) => {
-        fetchedServices.push({ id: docSnap.id, ...docSnap.data() } as Service);
-      });
-      setServices(fetchedServices);
+      const { data: serviceData } = await supabase
+        .from('services')
+        .select('*')
+        .order('displayOrder', { ascending: true });
 
+      if (serviceData) {
+        setServices(serviceData as Service[]);
+      }
     } catch (err) {
       console.error('Error fetching branches:', err);
       setBranches(DEFAULT_BRANCHES);
@@ -209,54 +210,71 @@ export default function AdminBranches() {
     if (formState.isMain) {
       for (const b of branches) {
         if (b.id !== branchId && b.isMain) {
-          await updateDoc(doc(db, 'branches', b.id), { isMain: false });
+          await supabase.from('branches').update({ isMain: false, is_main: false }).eq('id', b.id);
         }
       }
     }
 
-    const payload: Branch = {
+    const payload: any = {
       id: branchId,
       name: formState.name.trim(),
       slug: finalSlug,
       branchCode: formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`,
+      branch_code: formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`,
       address: formState.address.trim(),
       city: formState.city.trim(),
       state: formState.state.trim(),
       pincode: formState.pincode.trim(),
       googleMapsUrl: formState.googleMapsUrl.trim(),
-      latitude: formState.latitude !== '' ? parseFloat(formState.latitude) : undefined,
-      longitude: formState.longitude !== '' ? parseFloat(formState.longitude) : undefined,
+      google_maps_url: formState.googleMapsUrl.trim(),
+      latitude: formState.latitude !== '' ? parseFloat(formState.latitude) : null,
+      longitude: formState.longitude !== '' ? parseFloat(formState.longitude) : null,
       phone: formState.phone.trim(),
       whatsapp: formState.whatsapp.trim(),
-      email: formState.email.trim() || undefined,
+      email: formState.email.trim() || null,
       weeklyHoliday: formState.weeklyHoliday.trim(),
+      weekly_holiday: formState.weeklyHoliday.trim(),
       businessHours: formState.businessHours,
+      business_hours: formState.businessHours,
       description: formState.description.trim(),
-      imageUrl: formState.imageUrl.trim() || undefined,
+      imageUrl: formState.imageUrl.trim() || null,
+      image_url: formState.imageUrl.trim() || null,
       serviceIds: formState.serviceIds,
-      isMain: formState.isMain,
-      isFeatured: formState.isFeatured,
-      isActive: formState.isActive,
+      service_ids: formState.serviceIds,
+      isMain: !!formState.isMain,
+      is_main: !!formState.isMain,
+      isFeatured: !!formState.isFeatured,
+      is_featured: !!formState.isFeatured,
+      isActive: !!formState.isActive,
+      is_active: !!formState.isActive,
       displayOrder: Number(formState.displayOrder) || 1,
+      display_order: Number(formState.displayOrder) || 1,
       seoTitle: formState.seoTitle.trim() || `${formState.name} | MOBO SAVIOR`,
+      seo_title: formState.seoTitle.trim() || `${formState.name} | MOBO SAVIOR`,
       seoDescription: formState.seoDescription.trim() || `${formState.name} - ${formState.address}, ${formState.city}`,
+      seo_description: formState.seoDescription.trim() || `${formState.name} - ${formState.address}, ${formState.city}`,
       createdAt: editingBranch?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      created_at: editingBranch?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     try {
-      await setDoc(doc(db, 'branches', branchId), payload);
+      const { error } = await supabase.from('branches').upsert(payload);
+      if (error) throw error;
       setIsModalOpen(false);
-      fetchData();
-    } catch (err) {
+      await fetchData();
+      alert('Branch saved successfully!');
+    } catch (err: any) {
       console.error('Failed to save branch:', err);
-      alert('Error saving branch to database.');
+      alert('Error saving branch: ' + (err?.message || 'Database error'));
     }
   };
 
   const handleToggleActive = async (branch: Branch) => {
     try {
-      await updateDoc(doc(db, 'branches', branch.id), { isActive: !branch.isActive });
+      const { error } = await supabase.from('branches').update({ isActive: !branch.isActive, is_active: !branch.isActive }).eq('id', branch.id);
+      if (error) throw error;
       fetchData();
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -266,7 +284,7 @@ export default function AdminBranches() {
   const handleSetMainBranch = async (targetBranch: Branch) => {
     try {
       for (const b of branches) {
-        await updateDoc(doc(db, 'branches', b.id), { isMain: b.id === targetBranch.id });
+        await supabase.from('branches').update({ isMain: b.id === targetBranch.id, is_main: b.id === targetBranch.id }).eq('id', b.id);
       }
       fetchData();
     } catch (err) {
@@ -281,10 +299,13 @@ export default function AdminBranches() {
     }
     if (window.confirm(`Are you sure you want to delete branch "${branch.name}"?`)) {
       try {
-        await deleteDoc(doc(db, 'branches', branch.id));
-        fetchData();
-      } catch (err) {
+        const { error } = await supabase.from('branches').delete().eq('id', branch.id);
+        if (error) throw error;
+        await fetchData();
+        alert('Branch deleted successfully.');
+      } catch (err: any) {
         console.error('Failed to delete branch:', err);
+        alert('Failed to delete branch: ' + (err?.message || 'Database error'));
       }
     }
   };

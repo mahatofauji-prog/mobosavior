@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, signOut } from '../lib/supabase';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../lib/supabase';
-import { auth, db } from '../lib/supabase';
+import { auth } from '../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../lib/storageUpload';
 import { 
   Booking, Service, FAQItem, Review, GalleryItem, VideoItem, 
@@ -185,47 +184,55 @@ export default function AdminDashboard({
 
       // 1. Fetch from service_bookings (where repairs are submitted)
       try {
-        const sbQ = query(collection(db, 'service_bookings'), orderBy('created_at', 'desc'));
-        const sbSnapshot = await getDocs(sbQ);
-        sbSnapshot.forEach((doc) => {
-          const d = doc.data() as any;
-          const id = d.service_id || d.id;
-          if (id && !seenIds.has(id)) {
-            seenIds.add(id);
-            fetched.push({
-              id,
-              serviceId: id,
-              serviceName: d.problem || 'Device Repair',
-              brand: d.mobile_brand || '',
-              model: d.mobile_model || '',
-              problemDescription: d.problem || '',
-              customerName: d.customer_name || 'Customer',
-              phone: d.contact_number || '',
-              whatsapp: d.whatsapp_number || d.contact_number || '',
-              address: d.address || '',
-              preferredDate: d.preferred_date || '',
-              preferredTime: d.preferred_time || '',
-              status: (d.status === 'Booking Received' ? 'Pending' : d.status) as any,
-              createdAt: d.created_at || new Date().toISOString()
-            });
-          }
-        });
+        const { data: sbRows, error: sbErr } = await supabase
+          .from('service_bookings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!sbErr && sbRows) {
+          sbRows.forEach((d: any) => {
+            const id = d.service_id || d.id;
+            if (id && !seenIds.has(id)) {
+              seenIds.add(id);
+              fetched.push({
+                id,
+                serviceId: id,
+                serviceName: d.problem || 'Device Repair',
+                brand: d.mobile_brand || '',
+                model: d.mobile_model || '',
+                problemDescription: d.problem || '',
+                customerName: d.customer_name || 'Customer',
+                phone: d.contact_number || '',
+                whatsapp: d.whatsapp_number || d.contact_number || '',
+                address: d.address || '',
+                preferredDate: d.preferred_date || '',
+                preferredTime: d.preferred_time || '',
+                status: (d.status === 'Booking Received' ? 'Pending' : d.status) as any,
+                createdAt: d.created_at || new Date().toISOString()
+              });
+            }
+          });
+        }
       } catch (e) {
         // Fallback handled silently
       }
 
       // 2. Fetch from bookings table
       try {
-        const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        snapshot.forEach((doc) => {
-          const d = doc.data() as any;
-          const id = d.serviceId || d.id;
-          if (id && !seenIds.has(id)) {
-            seenIds.add(id);
-            fetched.push({ ...d } as Booking);
-          }
-        });
+        const { data: bRows, error: bErr } = await supabase
+          .from('bookings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!bErr && bRows) {
+          bRows.forEach((d: any) => {
+            const id = d.serviceId || d.service_id || d.id;
+            if (id && !seenIds.has(id)) {
+              seenIds.add(id);
+              fetched.push({ ...d, id } as Booking);
+            }
+          });
+        }
       } catch (e) {
         // Fallback handled silently
       }
@@ -241,21 +248,17 @@ export default function AdminDashboard({
   const fetchMedia = async () => {
     setLoadingMedia(true);
     try {
-      const gQ = query(collection(db, 'gallery'), orderBy('displayOrder', 'asc'));
-      const gSnapshot = await getDocs(gQ);
-      const fetchedGallery: GalleryItem[] = [];
-      gSnapshot.forEach((doc) => {
-        fetchedGallery.push({ id: doc.id, ...doc.data() } as GalleryItem);
-      });
-      setGallery(fetchedGallery);
+      const { data: gData } = await supabase
+        .from('gallery')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+      if (gData) setGallery(gData as GalleryItem[]);
 
-      const vQ = query(collection(db, 'videos'), orderBy('displayOrder', 'asc'));
-      const vSnapshot = await getDocs(vQ);
-      const fetchedVideos: VideoItem[] = [];
-      vSnapshot.forEach((doc) => {
-        fetchedVideos.push({ id: doc.id, ...doc.data() } as VideoItem);
-      });
-      setVideos(fetchedVideos);
+      const { data: vData } = await supabase
+        .from('videos')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+      if (vData) setVideos(vData as VideoItem[]);
     } catch (err) {
       console.error('Error fetching media:', err);
     } finally {
@@ -281,9 +284,9 @@ export default function AdminDashboard({
       const displayOrder = parseInt(formData.get('displayOrder') as string) || 1;
       const active = formData.get('active') === 'true';
       const featured = formData.get('featured') === 'true';
-      const altText = formData.get('altText') as string || title;
+      const altText = (formData.get('altText') as string) || title;
       const fileInput = e.currentTarget.querySelector('input[name="imageFile"]') as HTMLInputElement;
-      let imageUrl = formData.get('imageUrl') as string || '';
+      let imageUrl = (formData.get('imageUrl') as string) || '';
 
       if (fileInput && fileInput.files && fileInput.files.length > 0) {
         const file = fileInput.files[0];
@@ -303,25 +306,35 @@ export default function AdminDashboard({
       }
 
       const itemId = galleryModal.item?.id || `gal_${Date.now()}`;
-      const itemData = {
+      const itemData: any = {
+        id: itemId,
         imageUrl,
+        image_url: imageUrl,
         title,
         description,
         category,
         altText,
-        featured,
+        alt_text: altText,
+        featured: !!featured,
         displayOrder,
-        active,
-        createdAt: galleryModal.item?.createdAt || new Date().toISOString()
+        display_order: displayOrder,
+        active: active !== false,
+        is_active: active !== false,
+        createdAt: galleryModal.item?.createdAt || new Date().toISOString(),
+        created_at: galleryModal.item?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'gallery', itemId), itemData);
+      const { error } = await supabase.from('gallery').upsert(itemData);
+      if (error) throw error;
+
       setGalleryModal({ open: false });
-      fetchMedia();
+      await fetchMedia();
       alert('Photo saved successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving gallery item:', err);
-      alert('Failed to save photo.');
+      alert('Failed to save photo: ' + (err?.message || 'Database error'));
     } finally {
       setUploadLoading(false);
     }
@@ -330,15 +343,16 @@ export default function AdminDashboard({
   const handleDeleteGalleryItem = async (id: string, imageUrl: string) => {
     if (confirm('Are you sure you want to permanently delete this photo?')) {
       try {
-        await deleteDoc(doc(db, 'gallery', id));
+        const { error } = await supabase.from('gallery').delete().eq('id', id);
+        if (error) throw error;
         if (imageUrl) {
           await deleteMediaFile(imageUrl);
         }
-        fetchMedia();
+        await fetchMedia();
         alert('Photo deleted successfully.');
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error deleting gallery item:', err);
-        alert('Failed to delete photo.');
+        alert('Failed to delete photo: ' + (err?.message || 'Database error'));
       }
     }
   };
@@ -354,7 +368,7 @@ export default function AdminDashboard({
       const displayOrder = parseInt(formData.get('displayOrder') as string) || 1;
       const active = formData.get('active') === 'true';
       const featured = formData.get('featured') === 'true';
-      const rawVideoUrl = (formData.get('videoUrl') as string || '').trim();
+      const rawVideoUrl = ((formData.get('videoUrl') as string) || '').trim();
 
       const parsedVideo = parseVideoUrl(rawVideoUrl);
       if (!parsedVideo || !parsedVideo.isValid) {
@@ -364,27 +378,39 @@ export default function AdminDashboard({
       }
 
       const itemId = videoModal.item?.id || `vid_${Date.now()}`;
-      const itemData = {
+      const itemData: any = {
+        id: itemId,
         videoUrl: parsedVideo.originalUrl,
+        video_url: parsedVideo.originalUrl,
         videoPlatform: parsedVideo.platform,
+        video_platform: parsedVideo.platform,
         youtubeVideoId: parsedVideo.youtubeId || null,
+        youtube_video_id: parsedVideo.youtubeId || null,
         thumbnailUrl: parsedVideo.defaultThumbnail || null,
+        thumbnail_url: parsedVideo.defaultThumbnail || null,
         title,
         description,
         category,
-        featured,
+        featured: !!featured,
         displayOrder,
-        active,
-        createdAt: videoModal.item?.createdAt || new Date().toISOString()
+        display_order: displayOrder,
+        active: active !== false,
+        is_active: active !== false,
+        createdAt: videoModal.item?.createdAt || new Date().toISOString(),
+        created_at: videoModal.item?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'videos', itemId), itemData);
+      const { error } = await supabase.from('videos').upsert(itemData);
+      if (error) throw error;
+
       setVideoModal({ open: false });
-      fetchMedia();
+      await fetchMedia();
       alert('Video saved successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving video item:', err);
-      alert('Failed to save video.');
+      alert('Failed to save video: ' + (err?.message || 'Database error'));
     } finally {
       setUploadLoading(false);
     }
@@ -393,15 +419,16 @@ export default function AdminDashboard({
   const handleDeleteVideoItem = async (id: string, videoUrl: string) => {
     if (confirm('Are you sure you want to permanently delete this video?')) {
       try {
-        await deleteDoc(doc(db, 'videos', id));
+        const { error } = await supabase.from('videos').delete().eq('id', id);
+        if (error) throw error;
         if (videoUrl && (videoUrl.includes('supabase.co/storage') || videoUrl.includes('appspot.com'))) {
           await deleteMediaFile(videoUrl);
         }
-        fetchMedia();
+        await fetchMedia();
         alert('Video deleted successfully.');
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error deleting video item:', err);
-        alert('Failed to delete video.');
+        alert('Failed to delete video: ' + (err?.message || 'Database error'));
       }
     }
   };
@@ -420,8 +447,8 @@ export default function AdminDashboard({
     itemB.displayOrder = tempOrder;
 
     try {
-      await updateDoc(doc(db, 'gallery', itemA.id), { displayOrder: itemA.displayOrder });
-      await updateDoc(doc(db, 'gallery', itemB.id), { displayOrder: itemB.displayOrder });
+      await supabase.from('gallery').update({ displayOrder: itemA.displayOrder, display_order: itemA.displayOrder }).eq('id', itemA.id);
+      await supabase.from('gallery').update({ displayOrder: itemB.displayOrder, display_order: itemB.displayOrder }).eq('id', itemB.id);
       fetchMedia();
     } catch (err) {
       console.error('Error updating order:', err);
@@ -442,8 +469,8 @@ export default function AdminDashboard({
     itemB.displayOrder = tempOrder;
 
     try {
-      await updateDoc(doc(db, 'videos', itemA.id), { displayOrder: itemA.displayOrder });
-      await updateDoc(doc(db, 'videos', itemB.id), { displayOrder: itemB.displayOrder });
+      await supabase.from('videos').update({ displayOrder: itemA.displayOrder, display_order: itemA.displayOrder }).eq('id', itemA.id);
+      await supabase.from('videos').update({ displayOrder: itemB.displayOrder, display_order: itemB.displayOrder }).eq('id', itemB.id);
       fetchMedia();
     } catch (err) {
       console.error('Error updating order:', err);
@@ -452,7 +479,7 @@ export default function AdminDashboard({
 
   const handleToggleGalleryActive = async (id: string, currentStatus: boolean) => {
     try {
-      await updateDoc(doc(db, 'gallery', id), { active: !currentStatus });
+      await supabase.from('gallery').update({ active: !currentStatus, is_active: !currentStatus }).eq('id', id);
       fetchMedia();
     } catch (err) {
       console.error('Error toggling gallery active state:', err);
@@ -461,7 +488,7 @@ export default function AdminDashboard({
 
   const handleToggleVideoActive = async (id: string, currentStatus: boolean) => {
     try {
-      await updateDoc(doc(db, 'videos', id), { active: !currentStatus });
+      await supabase.from('videos').update({ active: !currentStatus, is_active: !currentStatus }).eq('id', id);
       fetchMedia();
     } catch (err) {
       console.error('Error toggling video active state:', err);
@@ -473,15 +500,23 @@ export default function AdminDashboard({
     onLogout();
   };
 
-  // Safe CRUD Actions
+  // Safe CRUD Actions for Settings
   const handleSaveBranding = async () => {
     setSaveLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'branding'), { brandName, logoUrl, tagline });
+      const data = { brandName, logoUrl, tagline };
+      const { error } = await supabase.from('settings').upsert({
+        id: 'branding',
+        data,
+        value: data,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
       onRefreshData();
       alert('Branding updated successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert('Failed to save branding: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -490,7 +525,7 @@ export default function AdminDashboard({
   const handleSaveContact = async () => {
     setSaveLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'contact'), {
+      const data = {
         name: 'MOBO SAVIOR',
         address,
         phone,
@@ -501,12 +536,19 @@ export default function AdminDashboard({
         whatsappChannelUrl,
         googleMapsUrl: mapsUrl,
         mapIframeUrl
+      };
+      const { error } = await supabase.from('settings').upsert({
+        id: 'contact',
+        data,
+        value: data,
+        updated_at: new Date().toISOString()
       });
+      if (error) throw error;
       onRefreshData();
       alert('Contact, location and social media settings updated successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save contact settings. Please try again.');
+      alert('Failed to save contact settings: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -515,18 +557,26 @@ export default function AdminDashboard({
   const handleSaveContent = async () => {
     setSaveLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'content'), {
+      const data = {
         heroTitle,
         heroDescription: heroDesc,
         ctaText: 'BOOK A REPAIR',
         aboutText,
         aboutHighlight,
         whyChooseUs: websiteContent.whyChooseUs
+      };
+      const { error } = await supabase.from('settings').upsert({
+        id: 'content',
+        data,
+        value: data,
+        updated_at: new Date().toISOString()
       });
+      if (error) throw error;
       onRefreshData();
       alert('Website Content updated successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert('Failed to save website content: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -535,7 +585,7 @@ export default function AdminDashboard({
   const handleSaveSEO = async () => {
     setSaveLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'seo'), {
+      const data = {
         siteTitle: seoTitle,
         metaDescription: seoDesc,
         searchConsoleVerification: seoVerification,
@@ -544,11 +594,19 @@ export default function AdminDashboard({
         secondaryKeywords: seoSettings.secondaryKeywords,
         canonicalUrl: seoSettings.canonicalUrl,
         googleAnalyticsId: gaMeasurementId
+      };
+      const { error } = await supabase.from('settings').upsert({
+        id: 'seo',
+        data,
+        value: data,
+        updated_at: new Date().toISOString()
       });
+      if (error) throw error;
       onRefreshData();
       alert('SEO & Indexing Configurations updated!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert('Failed to save SEO configurations: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -557,7 +615,7 @@ export default function AdminDashboard({
   const handleSaveHours = async () => {
     setSaveLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'businessHours'), {
+      const data = {
         monFri: monFriHours,
         saturday: satHours,
         sunday: sunHours,
@@ -565,12 +623,19 @@ export default function AdminDashboard({
         note: hoursNote,
         hoursNote: hoursNote,
         updatedAt: new Date().toISOString()
+      };
+      const { error } = await supabase.from('settings').upsert({
+        id: 'businessHours',
+        data,
+        value: data,
+        updated_at: new Date().toISOString()
       });
+      if (error) throw error;
       onRefreshData();
       alert('Business hours and store schedule saved successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save business hours.');
+      alert('Failed to save business hours: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -579,17 +644,24 @@ export default function AdminDashboard({
   const handleSaveAnalytics = async () => {
     setSaveLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'seo'), {
+      const data = {
         ...seoSettings,
         siteTitle: seoTitle,
         metaDescription: seoDesc,
         googleAnalyticsId: gaMeasurementId
-      }, { merge: true });
+      };
+      const { error } = await supabase.from('settings').upsert({
+        id: 'seo',
+        data,
+        value: data,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
       onRefreshData();
       alert('Google Analytics settings updated successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save analytics settings.');
+      alert('Failed to save analytics settings: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -598,11 +670,20 @@ export default function AdminDashboard({
   // Booking details update Notes / Status
   const handleUpdateBooking = async (id: string, updates: Partial<Booking>) => {
     try {
-      await updateDoc(doc(db, 'bookings', id), updates);
-      fetchBookings();
+      const dbUpdates: any = { ...updates };
+      if (updates.status) {
+        dbUpdates.status = updates.status;
+      }
+      // Update in service_bookings
+      await supabase.from('service_bookings').update(dbUpdates).or(`id.eq.${id},service_id.eq.${id}`);
+      // Update in bookings
+      await supabase.from('bookings').update(dbUpdates).or(`id.eq.${id},serviceId.eq.${id}`);
+      
+      await fetchBookings();
       if (selectedBooking && selectedBooking.id === id) {
         setSelectedBooking(prev => prev ? { ...prev, ...updates } : null);
       }
+      alert('Booking status updated successfully!');
     } catch (err) {
       console.error(err);
       alert('Failed to update booking status.');
@@ -612,11 +693,14 @@ export default function AdminDashboard({
   const handleDeleteBooking = async (id: string) => {
     if (confirm('Are you sure you want to permanently delete this service booking from the lab registers?')) {
       try {
-        await deleteDoc(doc(db, 'bookings', id));
+        await supabase.from('service_bookings').delete().or(`id.eq.${id},service_id.eq.${id}`);
+        await supabase.from('bookings').delete().or(`id.eq.${id},serviceId.eq.${id}`);
         setSelectedBooking(null);
-        fetchBookings();
+        await fetchBookings();
+        alert('Booking deleted successfully.');
       } catch (err) {
         console.error(err);
+        alert('Failed to delete booking.');
       }
     }
   };
@@ -801,30 +885,37 @@ export default function AdminDashboard({
     const data = new FormData(form);
 
     const id = faqModal.item?.id || `faq-${Date.now()}`;
-    const faq: FAQItem = {
+    const faqPayload: any = {
       id,
       question: data.get('question') as string,
       answer: data.get('answer') as string,
-      category: data.get('category') as string || 'General',
-      displayOrder: parseInt(data.get('displayOrder') as string) || 1
+      category: (data.get('category') as string) || 'General',
+      displayOrder: parseInt(data.get('displayOrder') as string) || 1,
+      display_order: parseInt(data.get('displayOrder') as string) || 1
     };
 
     try {
-      await setDoc(doc(db, 'faqs', id), faq);
+      const { error } = await supabase.from('faqs').upsert(faqPayload);
+      if (error) throw error;
       setFaqModal({ open: false });
-      onRefreshData();
-    } catch (err) {
+      if (onRefreshData) onRefreshData();
+      alert('FAQ saved successfully!');
+    } catch (err: any) {
       console.error(err);
+      alert('Failed to save FAQ: ' + (err?.message || 'Database error'));
     }
   };
 
   const handleDeleteFAQ = async (id: string) => {
     if (confirm('Are you sure you want to delete this FAQ?')) {
       try {
-        await deleteDoc(doc(db, 'faqs', id));
-        onRefreshData();
-      } catch (err) {
+        const { error } = await supabase.from('faqs').delete().eq('id', id);
+        if (error) throw error;
+        if (onRefreshData) onRefreshData();
+        alert('FAQ deleted successfully.');
+      } catch (err: any) {
         console.error(err);
+        alert('Failed to delete FAQ: ' + (err?.message || 'Database error'));
       }
     }
   };
@@ -836,38 +927,48 @@ export default function AdminDashboard({
     const data = new FormData(form);
 
     const id = slideModal.item?.id || `slide-${Date.now()}`;
-    const slide: SlideItem = {
+    const slidePayload: any = {
       id,
       imageUrl: data.get('imageUrl') as string,
+      image_url: data.get('imageUrl') as string,
       title: data.get('title') as string,
       active: data.get('active') === 'true',
-      displayOrder: parseInt(data.get('displayOrder') as string) || 1
+      is_active: data.get('active') === 'true',
+      displayOrder: parseInt(data.get('displayOrder') as string) || 1,
+      display_order: parseInt(data.get('displayOrder') as string) || 1
     };
 
     try {
-      await setDoc(doc(db, 'slideshow', id), slide);
+      const { error } = await supabase.from('slideshow').upsert(slidePayload);
+      if (error) throw error;
       setSlideModal({ open: false });
-      onRefreshData();
-    } catch (err) {
+      if (onRefreshData) onRefreshData();
+      alert('Slideshow image saved successfully!');
+    } catch (err: any) {
       console.error(err);
+      alert('Failed to save slideshow image: ' + (err?.message || 'Database error'));
     }
   };
 
   const handleDeleteSlide = async (id: string) => {
     if (confirm('Are you sure you want to delete this slideshow image?')) {
       try {
-        await deleteDoc(doc(db, 'slideshow', id));
-        onRefreshData();
-      } catch (err) {
+        const { error } = await supabase.from('slideshow').delete().eq('id', id);
+        if (error) throw error;
+        if (onRefreshData) onRefreshData();
+        alert('Slideshow image deleted successfully.');
+      } catch (err: any) {
         console.error(err);
+        alert('Failed to delete slideshow: ' + (err?.message || 'Database error'));
       }
     }
   };
 
   const handleToggleSlideActive = async (id: string, currentActive: boolean) => {
     try {
-      await updateDoc(doc(db, 'slideshow', id), { active: !currentActive });
-      onRefreshData();
+      const { error } = await supabase.from('slideshow').update({ active: !currentActive, is_active: !currentActive }).eq('id', id);
+      if (error) throw error;
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error(err);
     }
@@ -886,9 +987,9 @@ export default function AdminDashboard({
     neighborItem.displayOrder = tempOrder;
 
     try {
-      await updateDoc(doc(db, 'slideshow', currentItem.id), { displayOrder: currentItem.displayOrder });
-      await updateDoc(doc(db, 'slideshow', neighborItem.id), { displayOrder: neighborItem.displayOrder });
-      onRefreshData();
+      await supabase.from('slideshow').update({ displayOrder: currentItem.displayOrder, display_order: currentItem.displayOrder }).eq('id', currentItem.id);
+      await supabase.from('slideshow').update({ displayOrder: neighborItem.displayOrder, display_order: neighborItem.displayOrder }).eq('id', neighborItem.id);
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error(err);
     }
@@ -1840,7 +1941,8 @@ export default function AdminDashboard({
           <AdminSEOSettings
             seoSettings={seoSettings}
             onSave={async (updatedSettings) => {
-              await setDoc(doc(db, 'settings', 'seo'), updatedSettings);
+              const { error } = await supabase.from('settings').upsert({ id: 'seo', ...updatedSettings, updated_at: new Date().toISOString() });
+              if (error) throw error;
               onRefreshData();
             }}
           />

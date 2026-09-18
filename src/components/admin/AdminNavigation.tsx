@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { NavigationItem } from '../../types';
 import { Plus, Edit, Trash2, Save, X, Layers, Loader2, GripVertical, Check } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../lib/errors';
 import ImageUploader from './ImageUploader';
 
 export default function AdminNavigation() {
@@ -24,16 +22,18 @@ export default function AdminNavigation() {
   const fetchNavItems = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'navigation_items'), orderBy('displayOrder', 'asc'));
-      const snapshot = await getDocs(q);
-      const fetched: NavigationItem[] = [];
-      snapshot.forEach(docSnap => {
-        fetched.push({ id: docSnap.id, ...docSnap.data() } as NavigationItem);
-      });
-      setItems(fetched);
+      const { data, error: fetchErr } = await supabase
+        .from('navigation_items')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+
+      if (fetchErr) {
+        console.error('Error fetching navigation items:', fetchErr);
+      } else if (data) {
+        setItems(data as NavigationItem[]);
+      }
     } catch (err) {
       console.error(err);
-      handleFirestoreError(err, OperationType.GET, 'navigation_items');
     } finally {
       setLoading(false);
     }
@@ -66,12 +66,13 @@ export default function AdminNavigation() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this menu link?')) return;
     try {
-      await deleteDoc(doc(db, 'navigation_items', id));
+      const { error: delErr } = await supabase.from('navigation_items').delete().eq('id', id);
+      if (delErr) throw delErr;
       setSuccess('Menu link deleted successfully!');
       fetchNavItems();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to delete item.');
+      setError('Failed to delete item: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -87,23 +88,27 @@ export default function AdminNavigation() {
     setSuccess('');
 
     const itemId = editingItem?.id || `nav-${Date.now()}`;
-    const payload: NavigationItem = {
+    const payload: any = {
       id: itemId,
       label,
       url,
       displayOrder: Number(displayOrder) || 0,
+      display_order: Number(displayOrder) || 0,
       active,
-      imageUrl
+      is_active: active,
+      imageUrl: imageUrl || null,
+      image_url: imageUrl || null
     };
 
     try {
-      await setDoc(doc(db, 'navigation_items', itemId), payload);
+      const { error: saveErr } = await supabase.from('navigation_items').upsert(payload);
+      if (saveErr) throw saveErr;
       setSuccess('Navigation menu item saved successfully!');
       handleReset();
-      fetchNavItems();
-    } catch (err) {
+      await fetchNavItems();
+    } catch (err: any) {
       console.error(err);
-      setError('Failed to save navigation item.');
+      setError('Failed to save navigation item: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }

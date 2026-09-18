@@ -4,8 +4,7 @@ import {
   FileText, Search, Loader2, Edit3, CheckCircle2, Clock, 
   AlertTriangle, Hammer, Smartphone, Truck, ExternalLink, Download, X 
 } from 'lucide-react';
-import { db } from '../../lib/supabase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { ServiceBooking } from '../../types';
 
 export default function AdminServiceBookings() {
@@ -16,44 +15,54 @@ export default function AdminServiceBookings() {
   const [selectedBooking, setSelectedBooking] = useState<ServiceBooking | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  const fetchBookings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('service_bookings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching service_bookings:', error);
+      } else if (data) {
+        const bData: ServiceBooking[] = [];
+        const seenIds = new Set<string>();
+        data.forEach((d: any) => {
+          const sId = d.service_id || d.serviceId || d.id;
+          if (sId && !seenIds.has(sId)) {
+            seenIds.add(sId);
+            bData.push({
+              id: d.id || sId,
+              service_id: sId,
+              customer_name: d.customer_name || d.customerName || 'Customer',
+              address: d.address || '',
+              pin_code: d.pin_code || d.pinCode || '',
+              contact_number: d.contact_number || d.phone || '',
+              whatsapp_number: d.whatsapp_number || d.whatsapp || d.contact_number || d.phone || '',
+              mobile_brand: d.mobile_brand || d.brand || '',
+              mobile_model: d.mobile_model || d.model || '',
+              problem: d.problem || d.problemDescription || '',
+              preferred_date: d.preferred_date || d.preferredDate || '',
+              preferred_time: d.preferred_time || d.preferredTime || '',
+              front_image_url: d.front_image_url || d.frontImageUrl || '',
+              back_image_url: d.back_image_url || d.backImageUrl || '',
+              status: d.status || 'Booking Received',
+              created_at: d.created_at || d.createdAt || new Date().toISOString(),
+              updated_at: d.updated_at || new Date().toISOString()
+            });
+          }
+        });
+        setBookings(bData);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bookings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const q = query(collection(db, 'service_bookings'), orderBy('created_at', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const bData: ServiceBooking[] = [];
-      const seenIds = new Set<string>();
-      snapshot.forEach((doc) => {
-        const d = doc.data() as any;
-        const sId = d.service_id || d.serviceId || d.id;
-        if (sId && !seenIds.has(sId)) {
-          seenIds.add(sId);
-          bData.push({
-            id: d.id || sId,
-            service_id: sId,
-            customer_name: d.customer_name || d.customerName || 'Customer',
-            address: d.address || '',
-            pin_code: d.pin_code || d.pinCode || '',
-            contact_number: d.contact_number || d.phone || '',
-            whatsapp_number: d.whatsapp_number || d.whatsapp || d.contact_number || d.phone || '',
-            mobile_brand: d.mobile_brand || d.brand || '',
-            mobile_model: d.mobile_model || d.model || '',
-            problem: d.problem || d.problemDescription || '',
-            preferred_date: d.preferred_date || d.preferredDate || '',
-            preferred_time: d.preferred_time || d.preferredTime || '',
-            front_image_url: d.front_image_url || d.frontImageUrl || '',
-            back_image_url: d.back_image_url || d.backImageUrl || '',
-            status: d.status || 'Booking Received',
-            created_at: d.created_at || d.createdAt || new Date().toISOString(),
-            updated_at: d.updated_at || new Date().toISOString()
-          });
-        }
-      });
-      setBookings(bData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching bookings:", error);
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    fetchBookings();
   }, []);
 
   const filteredBookings = bookings.filter(b => 
@@ -80,34 +89,41 @@ export default function AdminServiceBookings() {
     if (!selectedBooking || updating) return;
     setUpdating(true);
     try {
-      const batch = writeBatch(db);
+      const timestamp = new Date().toISOString();
       
       // Update private collection
-      const privateRef = doc(db, 'service_bookings', selectedBooking.id);
-      batch.update(privateRef, { 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      });
+      await supabase
+        .from('service_bookings')
+        .update({ 
+          status: newStatus,
+          updated_at: timestamp
+        })
+        .eq('id', selectedBooking.id);
 
       // Update public collection
-      const publicRef = doc(db, 'service_bookings_public', selectedBooking.service_id);
-      batch.update(publicRef, {
-        status: newStatus,
-        last_updated: new Date().toISOString()
-      });
+      await supabase
+        .from('service_bookings_public')
+        .update({
+          status: newStatus,
+          last_updated: timestamp
+        })
+        .eq('service_id', selectedBooking.service_id);
 
       // Update general bookings collection
-      const generalRef = doc(db, 'bookings', selectedBooking.service_id);
-      batch.update(generalRef, {
-        status: newStatus === 'Booking Received' ? 'Pending' : (newStatus === 'Repairing' || newStatus === 'Diagnosis' ? 'In Progress' : (newStatus === 'Delivered' ? 'Completed' : newStatus)),
-        updated_at: new Date().toISOString()
-      });
+      const generalStatus = newStatus === 'Booking Received' ? 'Pending' : (newStatus === 'Repairing' || newStatus === 'Diagnosis' ? 'In Progress' : (newStatus === 'Delivered' ? 'Completed' : newStatus));
+      await supabase
+        .from('bookings')
+        .update({
+          status: generalStatus,
+          updated_at: timestamp
+        })
+        .eq('id', selectedBooking.service_id);
 
-      await batch.commit();
       setSelectedBooking({ ...selectedBooking, status: newStatus });
-    } catch (err) {
+      await fetchBookings();
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to update status.');
+      alert('Failed to update status: ' + (err?.message || 'Database error'));
     } finally {
       setUpdating(false);
     }

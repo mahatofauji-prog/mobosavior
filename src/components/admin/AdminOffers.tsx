@@ -1,6 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Offer, OfferCategory, OfferCTAType } from '../../types';
 import { getOfferStatus } from '../../utils/offerHelpers';
 import { DEFAULT_OFFERS, DEFAULT_OFFER_CATEGORIES } from '../../lib/seed';
@@ -58,20 +57,20 @@ export default function AdminOffers() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [offersSnap, categoriesSnap] = await Promise.all([
-        getDocs(query(collection(db, 'offers'), orderBy('displayOrder', 'asc'))),
-        getDocs(query(collection(db, 'offer_categories'), orderBy('displayOrder', 'asc')))
+      const [offersRes, categoriesRes] = await Promise.all([
+        supabase.from('offers').select('*').order('displayOrder', { ascending: true }),
+        supabase.from('offer_categories').select('*').order('displayOrder', { ascending: true })
       ]);
 
-      const fetchedOffers: Offer[] = [];
-      offersSnap.forEach(docSnap => {
-        fetchedOffers.push({ id: docSnap.id, ...docSnap.data() } as Offer);
-      });
+      if (offersRes.error) {
+        console.error('[Supabase Offers fetch error]:', offersRes.error);
+      }
+      if (categoriesRes.error) {
+        console.error('[Supabase Offer Categories fetch error]:', categoriesRes.error);
+      }
 
-      const fetchedCategories: OfferCategory[] = [];
-      categoriesSnap.forEach(docSnap => {
-        fetchedCategories.push({ id: docSnap.id, ...docSnap.data() } as OfferCategory);
-      });
+      const fetchedOffers = (offersRes.data || []) as Offer[];
+      const fetchedCategories = (categoriesRes.data || []) as OfferCategory[];
 
       setOffers(fetchedOffers.length > 0 ? fetchedOffers : DEFAULT_OFFERS);
       setCategories(fetchedCategories.length > 0 ? fetchedCategories : DEFAULT_OFFER_CATEGORIES);
@@ -94,34 +93,43 @@ export default function AdminOffers() {
 
     try {
       const id = editingOffer ? editingOffer.id : `offer-${Date.now()}`;
-      const newOfferData: Offer = {
+      const payload: any = {
         id,
         title: offerForm.title.trim(),
         description: offerForm.description.trim(),
         categoryId: offerForm.categoryId || (selectedCat ? selectedCat.id : 'cat-discount'),
+        category_id: offerForm.categoryId || (selectedCat ? selectedCat.id : 'cat-discount'),
         category: categoryName,
         discount: offerForm.discount.trim(),
-        imageUrl: offerForm.imageUrl.trim(),
-        startDate: offerForm.startDate,
-        endDate: offerForm.endDate,
-        terms: offerForm.terms.trim(),
+        discount_amount: offerForm.discount.trim(),
+        imageUrl: offerForm.imageUrl.trim() || null,
+        image_url: offerForm.imageUrl.trim() || null,
+        startDate: offerForm.startDate || null,
+        endDate: offerForm.endDate || null,
+        valid_until: offerForm.endDate || null,
+        terms: offerForm.terms.trim() || null,
         ctaText: offerForm.ctaText.trim() || 'Claim Offer',
         ctaType: offerForm.ctaType,
-        ctaValue: offerForm.ctaValue.trim(),
-        isFeatured: offerForm.isFeatured,
-        isActive: offerForm.isActive,
+        ctaValue: offerForm.ctaValue.trim() || null,
+        isFeatured: !!offerForm.isFeatured,
+        isActive: offerForm.isActive !== false,
+        is_active: offerForm.isActive !== false,
         displayOrder: Number(offerForm.displayOrder) || 1,
-        createdAt: editingOffer ? editingOffer.createdAt : new Date().toISOString()
+        display_order: Number(offerForm.displayOrder) || 1
       };
 
-      await setDoc(doc(db, 'offers', id), newOfferData);
+      const { error } = await supabase.from('offers').upsert(payload);
+      if (error) {
+        console.error('[Supabase Offer Save Error]:', error);
+        throw error;
+      }
       
       setIsOfferModalOpen(false);
-      fetchData();
+      await fetchData();
       alert(`Offer ${editingOffer ? 'updated' : 'created'} successfully!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving offer:', err);
-      alert('Failed to save offer. Please try again.');
+      alert('Failed to save offer: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -172,19 +180,25 @@ export default function AdminOffers() {
   const handleDeleteOffer = async (id: string) => {
     if (!confirm('Are you sure you want to delete this offer?')) return;
     try {
-      await deleteDoc(doc(db, 'offers', id));
-      fetchData();
-    } catch (err) {
+      const { error } = await supabase.from('offers').delete().eq('id', id);
+      if (error) throw error;
+      await fetchData();
+      alert('Offer deleted successfully.');
+    } catch (err: any) {
       console.error('Error deleting offer:', err);
+      alert('Failed to delete offer: ' + (err?.message || 'Database error'));
     }
   };
 
   const handleToggleOfferActive = async (offer: Offer) => {
     try {
-      await updateDoc(doc(db, 'offers', offer.id), {
-        isActive: !offer.isActive
-      });
-      fetchData();
+      const newActive = !offer.isActive;
+      const { error } = await supabase
+        .from('offers')
+        .update({ isActive: newActive, is_active: newActive })
+        .eq('id', offer.id);
+      if (error) throw error;
+      await fetchData();
     } catch (err) {
       console.error('Error toggling active:', err);
     }
@@ -199,23 +213,29 @@ export default function AdminOffers() {
       const slug = categoryForm.slug.trim() || categoryForm.name.toLowerCase().replace(/\s+/g, '-');
       const id = editingCategory ? editingCategory.id : `cat-${Date.now()}`;
 
-      const catData: OfferCategory = {
+      const catData: any = {
         id,
         name: categoryForm.name.trim(),
         slug,
-        description: categoryForm.description.trim(),
+        description: categoryForm.description.trim() || '',
         displayOrder: Number(categoryForm.displayOrder) || 1,
-        active: categoryForm.active
+        display_order: Number(categoryForm.displayOrder) || 1,
+        active: categoryForm.active !== false,
+        is_active: categoryForm.active !== false
       };
 
-      await setDoc(doc(db, 'offer_categories', id), catData);
+      const { error } = await supabase.from('offer_categories').upsert(catData);
+      if (error) {
+        console.error('[Supabase Offer Category Save Error]:', error);
+        throw error;
+      }
 
       setIsCategoryModalOpen(false);
-      fetchData();
+      await fetchData();
       alert(`Category ${editingCategory ? 'updated' : 'created'} successfully!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving category:', err);
-      alert('Failed to save category.');
+      alert('Failed to save category: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -246,10 +266,13 @@ export default function AdminOffers() {
   const handleDeleteCategory = async (id: string) => {
     if (!confirm('Are you sure you want to delete this offer category?')) return;
     try {
-      await deleteDoc(doc(db, 'offer_categories', id));
-      fetchData();
-    } catch (err) {
+      const { error } = await supabase.from('offer_categories').delete().eq('id', id);
+      if (error) throw error;
+      await fetchData();
+      alert('Offer category deleted successfully.');
+    } catch (err: any) {
       console.error('Error deleting category:', err);
+      alert('Failed to delete category: ' + (err?.message || 'Database error'));
     }
   };
 

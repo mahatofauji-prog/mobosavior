@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, writeBatch } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { WebsiteSection } from '../../types';
 import { DEFAULT_WEBSITE_SECTIONS } from '../../data/defaultSections';
 import { getAllSectionsMerged } from '../../utils/sectionSettings';
@@ -36,21 +35,22 @@ export default function AdminSections({ onRefreshData, onNavigate }: AdminSectio
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'hidden'>('all');
 
-  // Fetch sections from Firestore
+  // Fetch sections from Supabase
   const fetchSections = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'website_sections'));
-      const dbSections: WebsiteSection[] = [];
-      snap.forEach((docSnap) => {
-        dbSections.push({ id: docSnap.id, ...docSnap.data() } as WebsiteSection);
-      });
-
-      const merged = getAllSectionsMerged(dbSections);
-      setSections(merged);
+      const { data, error } = await supabase.from('website_sections').select('*');
+      if (error) {
+        console.error('Error fetching website_sections:', error);
+        setSections(DEFAULT_WEBSITE_SECTIONS);
+      } else if (data && data.length > 0) {
+        const merged = getAllSectionsMerged(data as WebsiteSection[]);
+        setSections(merged);
+      } else {
+        setSections(DEFAULT_WEBSITE_SECTIONS);
+      }
     } catch (err) {
       console.error('Error fetching website_sections:', err);
-      // Fallback to default sections
       setSections(DEFAULT_WEBSITE_SECTIONS);
     } finally {
       setLoading(false);
@@ -117,33 +117,36 @@ export default function AdminSections({ onRefreshData, onNavigate }: AdminSectio
     }
   };
 
-  // Save changes to Firestore
+  // Save changes to Supabase
   const handleSaveChanges = async () => {
     setSaving(true);
     setSaveSuccess(false);
     try {
-      const batch = writeBatch(db);
-      for (const sec of sections) {
-        const docRef = doc(db, 'website_sections', sec.id);
-        batch.set(docRef, {
-          id: sec.id,
-          page: sec.page,
-          sectionKey: sec.sectionKey,
-          sectionName: sec.sectionName,
-          description: sec.description || '',
-          isVisible: sec.isVisible,
-          displayOrder: sec.displayOrder || 1,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
+      const recordsToUpsert = sections.map(sec => ({
+        id: sec.id,
+        page: sec.page,
+        sectionKey: sec.sectionKey,
+        section_key: sec.sectionKey,
+        sectionName: sec.sectionName,
+        section_name: sec.sectionName,
+        description: sec.description || '',
+        isVisible: sec.isVisible,
+        is_visible: sec.isVisible,
+        displayOrder: sec.displayOrder || 1,
+        display_order: sec.displayOrder || 1,
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
 
-      await batch.commit();
+      const { error } = await supabase.from('website_sections').upsert(recordsToUpsert);
+      if (error) throw error;
+
       setSaveSuccess(true);
       if (onRefreshData) onRefreshData();
       setTimeout(() => setSaveSuccess(false), 4000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving section visibility settings:', err);
-      alert('Failed to save section settings to database. Please try again.');
+      alert('Failed to save section settings to database: ' + (err?.message || 'Database error'));
     } finally {
       setSaving(false);
     }

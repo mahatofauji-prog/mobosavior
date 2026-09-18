@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, orderBy, writeBatch } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { LegalPage, LegalSection } from '../../types';
 import { FileText, Save, Plus, Edit, Trash2, GripVertical, Check, X, Shield, RefreshCw } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../lib/errors';
 import { DEFAULT_TERMS_PAGE, DEFAULT_TERMS_SECTIONS, DEFAULT_PRIVACY_PAGE, DEFAULT_PRIVACY_SECTIONS } from '../../data/defaultLegalData';
 
 // A simple toolbar component that wraps selected text in a textarea
@@ -97,11 +95,13 @@ export default function AdminLegalPages() {
     try {
       // 1. Fetch Page
       let pageData: LegalPage | null = null;
-      const qPage = query(collection(db, 'legal_pages'), where('pageType', '==', pageType));
-      const pageSnap = await getDocs(qPage);
+      const { data: pageRows } = await supabase
+        .from('legal_pages')
+        .select('*')
+        .eq('pageType', pageType);
       
-      if (!pageSnap.empty) {
-        pageData = { id: pageSnap.docs[0].id, ...pageSnap.docs[0].data() } as LegalPage;
+      if (pageRows && pageRows.length > 0) {
+        pageData = pageRows[0] as LegalPage;
       } else {
         // Initialize default
         const newId = `legal_${pageType}`;
@@ -116,7 +116,7 @@ export default function AdminLegalPages() {
           isPublished: true,
           updatedAt: new Date().toISOString()
         };
-        await setDoc(doc(db, 'legal_pages', newId), pageData);
+        await supabase.from('legal_pages').upsert(pageData);
       }
       
       setPage(pageData);
@@ -124,19 +124,26 @@ export default function AdminLegalPages() {
       setMetaDescription(pageData.metaDescription);
       setIsPublished(pageData.isPublished);
 
-      // 2. Fetch Sections (safe without requiring composite index)
-      const qSec = query(collection(db, 'legal_sections'), where('pageId', '==', pageData.id));
-      const secSnap = await getDocs(qSec);
-      const fetchedSections: LegalSection[] = [];
-      secSnap.forEach(d => {
-        fetchedSections.push({ id: d.id, ...d.data() } as LegalSection);
-      });
+      // 2. Fetch Sections
+      const { data: secRows } = await supabase
+        .from('legal_sections')
+        .select('*')
+        .eq('pageId', pageData.id)
+        .order('displayOrder', { ascending: true });
+
+      const fetchedSections: LegalSection[] = (secRows as LegalSection[]) || [];
 
       if (fetchedSections.length === 0) {
         const defaultSecs = pageType === 'terms-conditions' ? DEFAULT_TERMS_SECTIONS : DEFAULT_PRIVACY_SECTIONS;
         for (const sec of defaultSecs) {
-          const secWithPageId = { ...sec, pageId: pageData.id };
-          await setDoc(doc(db, 'legal_sections', sec.id), secWithPageId);
+          const secWithPageId: any = { 
+            ...sec, 
+            pageId: pageData.id,
+            page_id: pageData.id,
+            display_order: sec.displayOrder,
+            is_active: sec.isActive
+          };
+          await supabase.from('legal_sections').upsert(secWithPageId);
           fetchedSections.push(secWithPageId);
         }
       }
@@ -146,7 +153,6 @@ export default function AdminLegalPages() {
       
     } catch (err) {
       console.error(err);
-      handleFirestoreError(err, OperationType.GET, 'legal_pages');
     } finally {
       setLoading(false);
     }
@@ -160,19 +166,24 @@ export default function AdminLegalPages() {
     if (!page) return;
     setSaveLoading(true);
     try {
-      const updatedPage = {
+      const updatedPage: any = {
         ...page,
         seoTitle,
+        seo_title: seoTitle,
         metaDescription,
+        meta_description: metaDescription,
         isPublished,
-        updatedAt: new Date().toISOString()
+        is_published: isPublished,
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      await setDoc(doc(db, 'legal_pages', page.id), updatedPage);
+      const { error } = await supabase.from('legal_pages').upsert(updatedPage);
+      if (error) throw error;
       setPage(updatedPage);
       alert('Page settings saved successfully.');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save page settings.');
+      alert('Failed to save page settings: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -200,23 +211,31 @@ export default function AdminLegalPages() {
 
     try {
       const secId = editingSection?.id || `sec_${Date.now()}`;
-      const newSec: LegalSection = {
+      const newSec: any = {
         id: secId,
         pageId: page.id,
+        page_id: page.id,
         heading: secHeading,
         content: secContent,
         isActive: secActive,
+        is_active: secActive,
         displayOrder: editingSection?.displayOrder ?? (sections.length + 1),
+        display_order: editingSection?.displayOrder ?? (sections.length + 1),
         createdAt: editingSection?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        created_at: editingSection?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'legal_sections', secId), newSec);
+      const { error } = await supabase.from('legal_sections').upsert(newSec);
+      if (error) throw error;
+
       setModalOpen(false);
-      fetchPageAndSections(activeTab);
-    } catch (err) {
+      await fetchPageAndSections(activeTab);
+      alert('Section saved successfully.');
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save section.');
+      alert('Failed to save section: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }
@@ -225,11 +244,13 @@ export default function AdminLegalPages() {
   const handleDeleteSection = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this section?')) return;
     try {
-      await deleteDoc(doc(db, 'legal_sections', id));
-      fetchPageAndSections(activeTab);
-    } catch (err) {
+      const { error } = await supabase.from('legal_sections').delete().eq('id', id);
+      if (error) throw error;
+      await fetchPageAndSections(activeTab);
+      alert('Section deleted successfully.');
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to delete section.');
+      alert('Failed to delete section: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -246,10 +267,8 @@ export default function AdminLegalPages() {
     itemB.displayOrder = tempOrder;
 
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'legal_sections', itemA.id), { displayOrder: itemA.displayOrder });
-      batch.update(doc(db, 'legal_sections', itemB.id), { displayOrder: itemB.displayOrder });
-      await batch.commit();
+      await supabase.from('legal_sections').update({ displayOrder: itemA.displayOrder, display_order: itemA.displayOrder }).eq('id', itemA.id);
+      await supabase.from('legal_sections').update({ displayOrder: itemB.displayOrder, display_order: itemB.displayOrder }).eq('id', itemB.id);
       fetchPageAndSections(activeTab);
     } catch (err) {
       console.error(err);

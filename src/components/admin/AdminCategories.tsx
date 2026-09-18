@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, collection, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  updateDoc, 
-  query, 
-  orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { ServiceCategory, Service } from '../../types';
 import { DEFAULT_CATEGORIES } from '../../data/modelsData';
 import ImageUploader from './ImageUploader';
@@ -84,13 +76,7 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
 
       if (error) {
         console.error('Error fetching categories from Supabase:', error);
-        const snap = await getDocs(query(collection(db, 'categories'), orderBy('displayOrder', 'asc')));
-        if (!snap.empty) {
-          const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceCategory));
-          setCategories(fetched);
-        } else {
-          setCategories(DEFAULT_CATEGORIES);
-        }
+        setCategories(DEFAULT_CATEGORIES);
       } else if (data && data.length > 0) {
         const mapped: ServiceCategory[] = data.map(item => ({
           id: item.id,

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Brand, PhoneModel, ServiceCategory, Service } from '../../types';
 import { DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_CATEGORIES } from '../../data/modelsData';
 import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';
@@ -67,8 +66,7 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
           active: b.is_active ?? b.active ?? true
         })));
       } else {
-        const brandsSnap = await getDocs(query(collection(db, 'brands'), orderBy('displayOrder', 'asc')));
-        if (!brandsSnap.empty) setBrands(brandsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Brand)));
+        setBrands(DEFAULT_BRANDS);
       }
 
       if (modelsRes.data && modelsRes.data.length > 0) {
@@ -85,8 +83,7 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
           availableServices: m.available_services || m.availableServices || []
         })));
       } else {
-        const modelsSnap = await getDocs(query(collection(db, 'models'), orderBy('displayOrder', 'asc')));
-        if (!modelsSnap.empty) setModels(modelsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PhoneModel)));
+        setModels(DEFAULT_MODELS);
       }
 
       if (catsRes.data && catsRes.data.length > 0) {
@@ -103,6 +100,8 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
           problemsCovered: c.problems_covered || c.problemsCovered || [],
           serviceSlugs: c.service_slugs || c.serviceSlugs || []
         })));
+      } else {
+        setCategories(DEFAULT_CATEGORIES);
       }
     } catch (err) {
       console.error('Error fetching brands/models:', err);

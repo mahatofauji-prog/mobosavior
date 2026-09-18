@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { Page, PageSection } from '../../types';
 import { 
   Plus, Edit, Trash2, Save, X, Eye, FileText, MoveUp, MoveDown, HelpCircle, 
   Settings, Globe, Loader2, Sparkles, Image as ImageIcon, Video, ToggleLeft, Layers 
 } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../lib/errors';
 import ImageUploader from './ImageUploader';
 
 interface AdminPagesProps {
@@ -55,16 +53,18 @@ export default function AdminPages({ onRefreshData }: AdminPagesProps) {
   const fetchPages = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'pages'), orderBy('displayOrder', 'asc'));
-      const snapshot = await getDocs(q);
-      const fetched: Page[] = [];
-      snapshot.forEach(docSnap => {
-        fetched.push({ id: docSnap.id, ...docSnap.data() } as Page);
-      });
-      setPages(fetched);
+      const { data, error: fetchErr } = await supabase
+        .from('pages')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+
+      if (fetchErr) {
+        console.error('Error loading pages:', fetchErr);
+      } else if (data) {
+        setPages(data as Page[]);
+      }
     } catch (err) {
       console.error('Error loading pages:', err);
-      handleFirestoreError(err, OperationType.GET, 'pages');
     } finally {
       setLoading(false);
     }
@@ -126,13 +126,15 @@ export default function AdminPages({ onRefreshData }: AdminPagesProps) {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you absolutely sure you want to delete this page?')) return;
     try {
-      await deleteDoc(doc(db, 'pages', id));
+      const { error: delErr } = await supabase.from('pages').delete().eq('id', id);
+      if (delErr) throw delErr;
       setSuccess('Page deleted successfully!');
       fetchPages();
       if (onRefreshData) onRefreshData();
-    } catch (err) {
+      alert('Page deleted successfully.');
+    } catch (err: any) {
       console.error('Error deleting page:', err);
-      setError('Failed to delete page.');
+      setError('Failed to delete page: ' + (err?.message || 'Database error'));
     }
   };
 
@@ -225,7 +227,7 @@ export default function AdminPages({ onRefreshData }: AdminPagesProps) {
     }
   };
 
-  // Submit whole page save to Firestore
+  // Submit whole page save to Supabase
   const handleSavePage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !slug) {
@@ -245,31 +247,45 @@ export default function AdminPages({ onRefreshData }: AdminPagesProps) {
     setSuccess('');
 
     const pageId = editingPage?.id || `page-${slug}`;
-    const pagePayload: Page = {
+    const pagePayload: any = {
       id: pageId,
       title,
       slug: slug.toLowerCase().replace(/[^a-z0-9\-]+/g, '-'),
       sections,
-      featuredImage: featuredImage || undefined,
-      seoTitle: seoTitle || undefined,
-      metaDescription: metaDescription || undefined,
-      ogImageUrl: ogImageUrl || featuredImage || undefined,
+      featuredImage: featuredImage || null,
+      featured_image: featuredImage || null,
+      seoTitle: seoTitle || null,
+      seo_title: seoTitle || null,
+      metaDescription: metaDescription || null,
+      meta_description: metaDescription || null,
+      ogImageUrl: ogImageUrl || featuredImage || null,
+      og_image_url: ogImageUrl || featuredImage || null,
       displayOrder: Number(displayOrder) || 0,
-      featured,
+      display_order: Number(displayOrder) || 0,
+      featured: !!featured,
       status,
       createdAt: editingPage?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      created_at: editingPage?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     try {
-      await setDoc(doc(db, 'pages', pageId), pagePayload);
+      const { error: upsertErr } = await supabase.from('pages').upsert(pagePayload);
+      if (upsertErr) {
+        console.error('[Supabase Page Save Error]:', upsertErr);
+        throw upsertErr;
+      }
+
       setSuccess('Page saved successfully!');
       setEditorOpen(false);
-      fetchPages();
+      await fetchPages();
       if (onRefreshData) onRefreshData();
-    } catch (err) {
+      alert('Page saved successfully!');
+    } catch (err: any) {
       console.error('Error saving page:', err);
-      setError('Failed to save page to database.');
+      setError('Failed to save page to database: ' + (err?.message || 'Database error'));
+      alert('Failed to save page: ' + (err?.message || 'Database error'));
     } finally {
       setSaveLoading(false);
     }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { supabase, collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { PriceItem, PriceType, Service, Brand, PhoneModel } from '../../types';
 import { getFormattedPriceString, formatAmount } from '../../utils/priceHelpers';
 import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';
@@ -84,13 +83,7 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
         }));
         setPrices(mappedPrices);
       } else {
-        const qPrices = query(collection(db, 'prices'), orderBy('displayOrder', 'asc'));
-        const pricesSnap = await getDocs(qPrices);
-        const fetchedPrices: PriceItem[] = [];
-        pricesSnap.forEach(docSnap => {
-          fetchedPrices.push({ id: docSnap.id, ...docSnap.data() } as PriceItem);
-        });
-        setPrices(fetchedPrices);
+        setPrices([]);
       }
 
       // 2. Fetch Services from Supabase
@@ -116,12 +109,7 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
           displayOrder: s.display_order ?? s.displayOrder ?? 1
         })));
       } else {
-        const servicesSnap = await getDocs(collection(db, 'services'));
-        const fetchedServices: Service[] = [];
-        servicesSnap.forEach(docSnap => {
-          fetchedServices.push({ id: docSnap.id, ...docSnap.data() } as Service);
-        });
-        setServices(fetchedServices.length > 0 ? fetchedServices : ALL_COMPREHENSIVE_SERVICES);
+        setServices(ALL_COMPREHENSIVE_SERVICES);
       }
 
       // 3. Fetch Brands
@@ -136,12 +124,7 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
           active: b.is_active ?? b.active ?? true
         })));
       } else {
-        const brandsSnap = await getDocs(collection(db, 'brands'));
-        const fetchedBrands: Brand[] = [];
-        brandsSnap.forEach(docSnap => {
-          fetchedBrands.push({ id: docSnap.id, ...docSnap.data() } as Brand);
-        });
-        setBrands(fetchedBrands.length > 0 ? fetchedBrands : DEFAULT_BRANDS);
+        setBrands(DEFAULT_BRANDS);
       }
 
       // 4. Fetch Models
@@ -160,12 +143,7 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
           availableServices: m.available_services || m.availableServices || []
         })));
       } else {
-        const modelsSnap = await getDocs(collection(db, 'models'));
-        const fetchedModels: PhoneModel[] = [];
-        modelsSnap.forEach(docSnap => {
-          fetchedModels.push({ id: docSnap.id, ...docSnap.data() } as PhoneModel);
-        });
-        setModels(fetchedModels.length > 0 ? fetchedModels : DEFAULT_MODELS);
+        setModels(DEFAULT_MODELS);
       }
     } catch (err) {
       console.error('Error fetching data for AdminPrices:', err);

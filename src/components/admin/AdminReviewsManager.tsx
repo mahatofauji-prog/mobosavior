@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { Review, GoogleReviewsSettings } from '../../types';
 import ImageUploader from './ImageUploader';
@@ -41,20 +40,30 @@ export default function AdminReviewsManager() {
     try {
       setLoading(true);
 
-      // 1. Fetch Testimonials
-      const q = query(collection(db, 'reviews'), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      const items: Review[] = [];
-      snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Review));
-      setReviews(items);
+      // 1. Fetch Testimonials from Supabase directly
+      const { data: revData, error: revErr } = await supabase
+        .from('reviews')
+        .select('*')
+        .order('createdAt', { ascending: false });
 
-      // 2. Fetch Google Settings
-      const setSnap = await getDoc(doc(db, 'settings', 'googleReviews'));
-      if (setSnap.exists()) {
-        const data = setSnap.data() as GoogleReviewsSettings;
-        setGooglePlaceId(data.googlePlaceId || '');
-        setGoogleApiKey(data.googleApiKey || '');
-        setEnableGoogleReviews(!!data.enableGoogleReviews);
+      if (revErr) {
+        console.error('[Supabase Reviews fetch error]:', revErr);
+      } else if (revData) {
+        setReviews(revData as Review[]);
+      }
+
+      // 2. Fetch Google Settings from Supabase settings table
+      const { data: setData, error: setErr } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'googleReviews')
+        .maybeSingle();
+
+      if (!setErr && setData) {
+        const raw = setData.data || setData.value || setData;
+        setGooglePlaceId(raw.googlePlaceId || '');
+        setGoogleApiKey(raw.googleApiKey || '');
+        setEnableGoogleReviews(!!raw.enableGoogleReviews);
       }
     } catch (err) {
       console.error('Error fetching admin reviews data:', err);
@@ -74,12 +83,21 @@ export default function AdminReviewsManager() {
         googleApiKey: googleApiKey.trim(),
         enableGoogleReviews
       };
-      await setDoc(doc(db, 'settings', 'googleReviews'), payload);
+      const { error } = await supabase.from('settings').upsert({
+        id: 'googleReviews',
+        data: payload,
+        value: payload,
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+
       setSettingsSuccess(true);
       setTimeout(() => setSettingsSuccess(false), 3000);
-    } catch (err) {
+      alert('Google Reviews settings saved successfully!');
+    } catch (err: any) {
       console.error('Error saving Google Reviews settings:', err);
-      alert('Failed to save Google Reviews settings.');
+      alert('Failed to save Google Reviews settings: ' + (err?.message || 'Database error'));
     } finally {
       setSettingsSaving(false);
     }
@@ -128,27 +146,41 @@ export default function AdminReviewsManager() {
       }
 
       const revId = editingItem ? editingItem.id : `rev-${Date.now()}`;
-      const payload: Review = {
+      const payload: any = {
         id: revId,
         customerName: customerName.trim(),
+        customer_name: customerName.trim(),
         reviewerName: customerName.trim(),
-        rating,
+        reviewer_name: customerName.trim(),
+        rating: Number(rating) || 5,
         reviewText: reviewText.trim(),
-        customerPhotoUrl: finalPhotoUrl || undefined,
+        review_text: reviewText.trim(),
+        customerPhotoUrl: finalPhotoUrl || null,
+        customer_photo_url: finalPhotoUrl || null,
         source: 'testimonial',
-        featured,
-        active,
-        displayOrder,
+        featured: !!featured,
+        active: active !== false,
+        is_active: active !== false,
+        displayOrder: Number(displayOrder) || 1,
+        display_order: Number(displayOrder) || 1,
         createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'reviews', revId), payload);
+      const { error: revErr } = await supabase.from('reviews').upsert(payload);
+      if (revErr) {
+        console.error('[Supabase Review Save Error]:', revErr);
+        throw revErr;
+      }
+
       setModalOpen(false);
       await fetchData();
-    } catch (err) {
+      alert(`Testimonial ${editingItem ? 'updated' : 'created'} successfully!`);
+    } catch (err: any) {
       console.error('Error saving testimonial:', err);
-      alert('Failed to save testimonial.');
+      alert('Failed to save testimonial: ' + (err?.message || 'Database error'));
     } finally {
       setFormLoading(false);
     }
@@ -157,16 +189,24 @@ export default function AdminReviewsManager() {
   const handleDeleteReview = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this review?')) return;
     try {
-      await deleteDoc(doc(db, 'reviews', id));
+      const { error } = await supabase.from('reviews').delete().eq('id', id);
+      if (error) throw error;
       await fetchData();
-    } catch (err) {
+      alert('Review deleted successfully.');
+    } catch (err: any) {
       console.error('Error deleting review:', err);
+      alert('Failed to delete review: ' + (err?.message || 'Database error'));
     }
   };
 
   const handleToggleActive = async (item: Review) => {
     try {
-      await updateDoc(doc(db, 'reviews', item.id), { active: !item.active });
+      const newActive = !item.active;
+      const { error } = await supabase
+        .from('reviews')
+        .update({ active: newActive, is_active: newActive })
+        .eq('id', item.id);
+      if (error) throw error;
       await fetchData();
     } catch (err) {
       console.error('Error toggling active review status:', err);

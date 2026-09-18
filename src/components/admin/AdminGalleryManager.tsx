@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, orderBy } from '../../lib/supabase';
-import { db } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { uploadMediaFile, deleteMediaFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
@@ -107,19 +106,29 @@ export default function AdminGalleryManager() {
   async function fetchData() {
     try {
       setLoading(true);
-      // Fetch Gallery
-      const qG = query(collection(db, 'gallery'), orderBy('displayOrder', 'asc'));
-      const snapG = await getDocs(qG);
-      const items: GalleryItem[] = [];
-      snapG.forEach((d) => items.push({ id: d.id, ...d.data() } as GalleryItem));
-      setGallery(items);
+      // Fetch Gallery from Supabase directly
+      const { data: gData, error: gErr } = await supabase
+        .from('gallery')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+
+      if (gErr) {
+        console.error('[Supabase Gallery fetch error]:', gErr);
+      } else if (gData) {
+        setGallery(gData as GalleryItem[]);
+      }
 
       // Fetch Services for linking
-      const qS = query(collection(db, 'services'));
-      const snapS = await getDocs(qS);
-      const sItems: Service[] = [];
-      snapS.forEach((d) => sItems.push({ id: d.id, ...d.data() } as Service));
-      setServices(sItems);
+      const { data: sData, error: sErr } = await supabase
+        .from('services')
+        .select('*')
+        .order('displayOrder', { ascending: true });
+
+      if (sErr) {
+        console.error('[Supabase Services fetch error in Gallery]:', sErr);
+      } else if (sData) {
+        setServices(sData as Service[]);
+      }
     } catch (err) {
       console.error('Error fetching admin gallery:', err);
     } finally {
@@ -229,15 +238,17 @@ export default function AdminGalleryManager() {
       const itemId = editingItem ? editingItem.id : `gal-${Date.now()}`;
       const finalCategoryId = mapCategoryToId(category) || (mediaType === 'video' ? 'repairing_videos' : 'repairing');
 
-      const rawPayload: any = {
+      const payload: any = {
         id: itemId,
         title: title || (mediaType === 'video' ? 'Repair Video' : 'Repair Gallery Item'),
         description: description || '',
         category: finalCategoryId,
         mediaType: mediaType || 'image',
         imageUrl: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
+        image_url: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
         thumbnailUrl: mediaType === 'video' ? officialThumbnailUrl : null,
         videoUrl: finalVideoUrl || null,
+        video_url: finalVideoUrl || null,
         videoPlatform: videoPlatform || null,
         youtubeVideoId: youtubeVideoId || null,
         beforeImageUrl: finalBeforeUrl || null,
@@ -247,30 +258,20 @@ export default function AdminGalleryManager() {
         model: model || null,
         featured: !!featured,
         active: active !== false,
+        is_active: active !== false,
         displayOrder: Number(displayOrder) || 1,
+        display_order: Number(displayOrder) || 1,
         createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
-      const cleanFirestoreData = (data: Record<string, any>) => {
-        const cleaned: Record<string, any> = {};
-        for (const [key, value] of Object.entries(data)) {
-          if (value === undefined) {
-            cleaned[key] = null;
-          } else if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-            cleaned[key] = cleanFirestoreData(value);
-          } else {
-            cleaned[key] = value;
-          }
-        }
-        return cleaned;
-      };
+      const { error: saveErr } = await supabase.from('gallery').upsert(payload);
+      if (saveErr) {
+        console.error('[Supabase Gallery Save Error]:', saveErr);
+        throw saveErr;
+      }
 
-      const payload = cleanFirestoreData(rawPayload);
-
-      await setDoc(doc(db, 'gallery', itemId), payload);
-
-      // If it's a video, also sync to videos collection
+      // If it's a video, also sync to videos table
       if (mediaType === 'video' && finalVideoUrl) {
         const videoPayload = {
           id: itemId,
@@ -278,23 +279,31 @@ export default function AdminGalleryManager() {
           description: description || '',
           category: finalCategoryId,
           videoUrl: finalVideoUrl,
+          video_url: finalVideoUrl,
           videoPlatform: videoPlatform || null,
-          youtubeVideoId: youtubeVideoId || null,
           thumbnailUrl: officialThumbnailUrl,
+          thumbnail_url: officialThumbnailUrl,
           featured: !!featured,
           active: active !== false,
+          is_active: active !== false,
           displayOrder: Number(displayOrder) || 1,
-          createdAt: rawPayload.createdAt,
-          updatedAt: new Date().toISOString()
+          display_order: Number(displayOrder) || 1,
+          createdAt: payload.createdAt,
+          created_at: payload.created_at,
+          serviceSlug: serviceSlug || null,
+          brand: brand || null,
+          model: model || null
         };
-        await setDoc(doc(db, 'videos', itemId), cleanFirestoreData(videoPayload));
+        const { error: vErr } = await supabase.from('videos').upsert(videoPayload);
+        if (vErr) console.warn('[Supabase Sync Video Error]:', vErr);
       }
 
       setModalOpen(false);
       await fetchData();
-    } catch (err) {
+      alert(`Gallery item ${editingItem ? 'updated' : 'created'} successfully!`);
+    } catch (err: any) {
       console.error('Error saving gallery item:', err);
-      alert('Failed to save gallery item. Please try again.');
+      alert('Failed to save gallery item: ' + (err?.message || 'Database error.'));
     } finally {
       setUploadLoading(false);
     }
@@ -305,18 +314,18 @@ export default function AdminGalleryManager() {
     setDeleteLoading(true);
     setDeleteError(null);
     try {
-      // 1. Delete from Firestore gallery collection
-      await deleteDoc(doc(db, 'gallery', itemToDelete.id));
+      // 1. Delete from Supabase gallery table
+      const { error: gDelErr } = await supabase.from('gallery').delete().eq('id', itemToDelete.id);
+      if (gDelErr) throw gDelErr;
       
-      // 2. Delete from videos collection (legacy/compatibility)
+      // 2. Delete from videos table if present
       try {
-        await deleteDoc(doc(db, 'videos', itemToDelete.id));
+        await supabase.from('videos').delete().eq('id', itemToDelete.id);
       } catch (e) {
-        // ignore if not in videos
+        // ignore
       }
 
       // 3. For video items: delete only database records!
-      // Do NOT attempt to delete anything from social platforms, and no thumbnail storage cleanup.
       const isVideoItem = itemToDelete.mediaType === 'video' || Boolean(itemToDelete.videoUrl);
       if (!isVideoItem) {
         const { imageUrl, beforeImageUrl, afterImageUrl } = itemToDelete;
@@ -345,12 +354,10 @@ export default function AdminGalleryManager() {
       // 4. Clean up state and re-fetch
       setItemToDelete(null);
       await fetchData();
-      
-      setTimeout(() => alert('Gallery item deleted successfully.'), 100);
-      
+      alert('Gallery item deleted successfully.');
     } catch (err: any) {
       console.error('Error deleting gallery item:', err);
-      setDeleteError(err.message || 'Unable to delete this gallery item. Please try again.');
+      setDeleteError(err?.message || 'Unable to delete this gallery item. Please try again.');
     } finally {
       setDeleteLoading(false);
     }
@@ -359,12 +366,16 @@ export default function AdminGalleryManager() {
   const handleToggleActive = async (item: GalleryItem) => {
     try {
       const newActive = !item.active;
-      await updateDoc(doc(db, 'gallery', item.id), { active: newActive });
+      const { error } = await supabase
+        .from('gallery')
+        .update({ active: newActive, is_active: newActive })
+        .eq('id', item.id);
+      if (error) throw error;
+
       try {
-        await updateDoc(doc(db, 'videos', item.id), { active: newActive });
-      } catch (e) {
-        // ignore
-      }
+        await supabase.from('videos').update({ active: newActive, is_active: newActive }).eq('id', item.id);
+      } catch (e) {}
+
       await fetchData();
     } catch (err) {
       console.error('Error toggling active status:', err);
@@ -374,12 +385,16 @@ export default function AdminGalleryManager() {
   const handleToggleFeatured = async (item: GalleryItem) => {
     try {
       const newFeatured = !item.featured;
-      await updateDoc(doc(db, 'gallery', item.id), { featured: newFeatured });
+      const { error } = await supabase
+        .from('gallery')
+        .update({ featured: newFeatured })
+        .eq('id', item.id);
+      if (error) throw error;
+
       try {
-        await updateDoc(doc(db, 'videos', item.id), { featured: newFeatured });
-      } catch (e) {
-        // ignore
-      }
+        await supabase.from('videos').update({ featured: newFeatured }).eq('id', item.id);
+      } catch (e) {}
+
       await fetchData();
     } catch (err) {
       console.error('Error toggling featured status:', err);

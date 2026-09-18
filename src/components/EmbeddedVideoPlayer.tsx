@@ -64,6 +64,31 @@ export default function EmbeddedVideoPlayer({
     );
   }
 
+  // If embedError occurs or for social links where user wants custom poster/thumbnail fallback view initially
+  if (embedError) {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
+        {thumbnailUrl && (
+          <div className="absolute inset-0">
+            <img src={thumbnailUrl} alt={title} className="w-full h-full object-cover opacity-50 blur-sm" />
+            <div className="absolute inset-0 bg-black/60" />
+          </div>
+        )}
+        <div className="relative z-10 flex flex-col items-center justify-center p-6 text-center text-slate-300">
+          <p className="text-sm font-bold text-white mb-2">{title}</p>
+          <a
+            href={videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors flex items-center gap-2"
+          >
+            <ExternalLink className="w-4 h-4" /> Open in {parsed.platform.toUpperCase()}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // 2. YouTube Player
   if (parsed.platform === 'youtube') {
     return (

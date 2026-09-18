@@ -5,7 +5,7 @@ import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryL
 import BeforeAfterSlider from '../BeforeAfterSlider';
 import ImageUploader from './ImageUploader';
 import VideoThumbnail from '../VideoThumbnail';
-import { extractFrameFromVideoFile, extractFrameFromVideoUrl, blobToFile } from '../../lib/videoThumbnailExtractor';
+import { extractFrameFromVideoFile, extractFrameFromVideoUrl, blobToFile, generateBrandedVideoPoster } from '../../lib/videoThumbnailExtractor';
 import { parseVideoUrl, getVideoPlatformLabel, isValidSocialVideoUrl, isDirectVideoUrl } from '../../lib/videoUtils';
 import { 
   Plus, Edit, Trash2, Eye, Star, Upload, Loader2, Sparkles, Image, Video, 
@@ -358,8 +358,23 @@ export default function AdminGalleryManager() {
             console.warn('Failed to upload dataURL thumbnail:', e);
             officialThumbnailUrl = extractedThumbnailUrl;
           }
-        } else {
+        } else if (extractedThumbnailUrl) {
           officialThumbnailUrl = extractedThumbnailUrl;
+        } else if (parsedVideo?.defaultThumbnail) {
+          officialThumbnailUrl = parsedVideo.defaultThumbnail;
+        } else {
+          // Auto-generate branded high-res video poster as fallback
+          try {
+            const poster = await generateBrandedVideoPoster(
+              title || 'Repair Video',
+              videoPlatform || 'video',
+              getCategoryLabel(category) || 'Micro-Soldering'
+            );
+            const posterFile = blobToFile(poster.blob, `poster_${Date.now()}.jpg`);
+            officialThumbnailUrl = await uploadFileToStorage(posterFile, 'thumbnails');
+          } catch (pErr) {
+            console.warn('Poster generation fallback failed:', pErr);
+          }
         }
       }
 

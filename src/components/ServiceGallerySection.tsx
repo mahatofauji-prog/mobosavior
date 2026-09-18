@@ -4,6 +4,7 @@ import { db } from '../lib/supabase';
 import { GalleryItem } from '../types';
 import BeforeAfterSlider from './BeforeAfterSlider';
 import VideoThumbnail from './VideoThumbnail';
+import EmbeddedVideoPlayer from './EmbeddedVideoPlayer';
 import { Sparkles, Eye, Play, ArrowRight, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -109,7 +110,7 @@ export default function ServiceGallerySection({
                   >
                     <VideoThumbnail
                       videoUrl={item.videoUrl}
-                      thumbnailUrl={item.thumbnailUrl}
+                      thumbnailUrl={item.thumbnailUrl || item.imageUrl}
                       title={item.title}
                       aspectRatio="4/3"
                       showPlayButton={true}
@@ -175,28 +176,14 @@ export default function ServiceGallerySection({
               </div>
 
               {activeMediaModal.mediaType === 'video' && activeMediaModal.videoUrl ? (
-                <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-slate-800">
-                  {activeMediaModal.videoUrl.includes('youtube.com') || activeMediaModal.videoUrl.includes('youtu.be') ? (
-                    <iframe
-                      src={(() => {
-                        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-                        const match = activeMediaModal.videoUrl.match(regExp);
-                        const videoId = match && match[2].length === 11 ? match[2] : '';
-                        return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-                      })()}
-                      title={activeMediaModal.title}
-                      className="absolute inset-0 w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <video
-                      src={activeMediaModal.videoUrl}
-                      controls
-                      autoPlay
-                      className="w-full h-full object-contain"
-                    />
-                  )}
+                <div className="relative w-full min-h-[300px] max-h-[75vh] bg-black rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                  <EmbeddedVideoPlayer
+                    videoUrl={activeMediaModal.videoUrl}
+                    title={activeMediaModal.title}
+                    thumbnailUrl={activeMediaModal.thumbnailUrl || activeMediaModal.imageUrl}
+                    autoPlay={true}
+                    className="w-full h-full"
+                  />
                 </div>
               ) : (
                 <div className="rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-slate-800 max-h-[60vh]">

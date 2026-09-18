@@ -176,7 +176,7 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
                   >
                     <VideoThumbnail
                       videoUrl={item.videoUrl}
-                      thumbnailUrl={item.thumbnailUrl}
+                      thumbnailUrl={item.thumbnailUrl || item.imageUrl}
                       title={item.title}
                       aspectRatio="4/3"
                       showPlayButton={true}

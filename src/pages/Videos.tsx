@@ -236,12 +236,13 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Player aspect-video wrapper */}
-              <div className="relative aspect-video bg-black w-full flex items-center justify-center overflow-hidden">
+              {/* Player wrapper */}
+              <div className="relative min-h-[320px] max-h-[80vh] bg-black w-full flex items-center justify-center overflow-hidden">
                 <EmbeddedVideoPlayer
                   videoUrl={activeVideo.videoUrl}
                   title={activeVideo.title}
                   thumbnailUrl={activeVideo.thumbnailUrl}
+                  autoPlay={true}
                 />
               </div>
 

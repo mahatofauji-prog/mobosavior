@@ -242,7 +242,7 @@ export default function AdminGalleryManager() {
     setAfterFile(null);
     setVideoFile(null);
     setVideoUploadMode('url');
-    setExtractedThumbnailUrl(item.thumbnailUrl || item.thumbnail_url || item.imageUrl || null);
+    setExtractedThumbnailUrl(item.thumbnailUrl || item.imageUrl || null);
     setExtractedThumbnailBlob(null);
     setCustomThumbnailFile(null);
     setFrameTimestamp(1.0);
@@ -331,7 +331,7 @@ export default function AdminGalleryManager() {
         if (customThumbnailFile) {
           officialThumbnailUrl = await uploadFileToStorage(customThumbnailFile, 'thumbnails');
         } else if (editingItem) {
-          officialThumbnailUrl = editingItem.imageUrl || editingItem.thumbnailUrl || editingItem.thumbnail_url || null;
+          officialThumbnailUrl = editingItem.imageUrl || editingItem.thumbnailUrl || null;
         } else {
           officialThumbnailUrl = null;
         }

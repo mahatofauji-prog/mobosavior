@@ -12,6 +12,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import SEOHead from './components/SEOHead';
 import LocalBusinessSchema from './components/LocalBusinessSchema';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import Home from './pages/Home';
@@ -493,7 +494,9 @@ export default function App() {
 
           {/* 3. Primary View Render Frame */}
           <div className="flex-grow">
-            {renderRoutePage()}
+            <ErrorBoundary componentName="Main View">
+              {renderRoutePage()}
+            </ErrorBoundary>
           </div>
 
           {/* 4. Footer Copy Bar */}
@@ -502,7 +505,9 @@ export default function App() {
       ) : (
         /* Admin Isolated View */
         <div className="flex-grow flex flex-col">
-          {renderRoutePage()}
+          <ErrorBoundary componentName="Admin Portal">
+            {renderRoutePage()}
+          </ErrorBoundary>
         </div>
       )}
     </div>

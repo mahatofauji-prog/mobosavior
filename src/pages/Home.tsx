@@ -275,29 +275,30 @@ export default function Home({ onNavigate, services, reviews, content, contact, 
   }, []);
 
   // Helpers to safely extract media previews
-  const getYoutubeEmbed = (url: string) => {
+  const getYoutubeEmbed = (url?: string | null) => {
+    if (!url || typeof url !== 'string') return '';
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
-    if (match && match[2].length === 11) {
+    if (match && match[2] && match[2].length === 11) {
       return `https://www.youtube.com/embed/${match[2]}`;
     }
     return url;
   };
 
-  const getYoutubeThumb = (url: string) => {
-    if (!url) return 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=600';
+  const getYoutubeThumb = (url?: string | null) => {
+    if (!url || typeof url !== 'string') return 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=600';
     if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('embed/')) {
       const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
       const match = url.match(regExp);
-      if (match && match[2].length === 11) {
+      if (match && match[2] && match[2].length === 11) {
         return `https://img.youtube.com/vi/${match[2]}/hqdefault.jpg`;
       }
     }
     return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=600';
   };
 
-  const firstPhotoUrl = activePhotos.length > 0 ? activePhotos[0].imageUrl : '';
-  const firstVideoThumbnailUrl = activeVideos.length > 0 ? getYoutubeThumb(activeVideos[0].videoUrl) : '';
+  const firstPhotoUrl = activePhotos.length > 0 && activePhotos[0]?.imageUrl ? activePhotos[0].imageUrl : '';
+  const firstVideoThumbnailUrl = activeVideos.length > 0 ? getYoutubeThumb(activeVideos[0]?.videoUrl) : '';
 
   useEffect(() => {
     if (slideshowItems.length <= 1) return;
@@ -979,21 +980,23 @@ export default function Home({ onNavigate, services, reviews, content, contact, 
 
             {/* Left Portion: Playback Panel */}
             <div className="flex-grow bg-black relative aspect-video md:aspect-auto md:w-3/5">
-              {selectedVideo.videoUrl.includes('youtube.com') || selectedVideo.videoUrl.includes('youtu.be') ? (
+              {selectedVideo && selectedVideo.videoUrl && (selectedVideo.videoUrl.includes('youtube.com') || selectedVideo.videoUrl.includes('youtu.be')) ? (
                 <iframe
                   src={`${getYoutubeEmbed(selectedVideo.videoUrl)}?autoplay=1&mute=0`}
-                  title={selectedVideo.title}
+                  title={selectedVideo.title || 'Repair Video'}
                   className="absolute inset-0 w-full h-full border-0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
-              ) : (
+              ) : selectedVideo && selectedVideo.videoUrl ? (
                 <video 
                   src={selectedVideo.videoUrl} 
                   controls 
                   autoPlay 
                   className="absolute inset-0 w-full h-full object-contain"
                 />
+              ) : (
+                <div className="p-6 text-center text-xs text-slate-400">Video source unavailable</div>
               )}
             </div>
 
@@ -1004,7 +1007,7 @@ export default function Home({ onNavigate, services, reviews, content, contact, 
                   <span className="text-[9px] font-black tracking-widest text-[#0284C7] uppercase">
                     LAB DEMONSTRATIONS ({activeVideos.length})
                   </span>
-                  <h4 className="text-sm font-black text-white truncate">{selectedVideo.title}</h4>
+                  <h4 className="text-sm font-black text-white truncate">{selectedVideo?.title || 'Repair Video'}</h4>
                 </div>
 
                 {/* Playlist list */}

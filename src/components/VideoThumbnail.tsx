@@ -18,11 +18,13 @@ export default function VideoThumbnail({
   title = 'Repair Video',
   className = '',
   aspectRatio = '4/3',
-  showPlayButton = true
+  showPlayButton = true,
+  priority = false
 }: VideoThumbnailProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
 
+  const safeTitle = title || 'Repair Video';
   const parsed = parseVideoUrl(videoUrl);
   const officialThumb = getOfficialVideoThumbnail(videoUrl, thumbnailUrl);
   const isDirect = isDirectVideoUrl(videoUrl);

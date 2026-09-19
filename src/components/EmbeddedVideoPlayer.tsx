@@ -3,9 +3,9 @@ import { parseVideoUrl } from '../lib/videoUtils';
 import { AlertCircle, ExternalLink, Play } from 'lucide-react';
 
 interface EmbeddedVideoPlayerProps {
-  videoUrl: string;
+  videoUrl?: string | null;
   title?: string;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string | null;
   className?: string;
   autoPlay?: boolean;
 }
@@ -18,9 +18,10 @@ export default function EmbeddedVideoPlayer({
   autoPlay = false
 }: EmbeddedVideoPlayerProps) {
   const [embedError, setEmbedError] = useState(false);
-  const parsed = parseVideoUrl(videoUrl);
+  const safeVideoUrl = typeof videoUrl === 'string' ? videoUrl.trim() : '';
+  const parsed = parseVideoUrl(safeVideoUrl);
 
-  if (!parsed || !parsed.isValid || embedError) {
+  if (!safeVideoUrl || !parsed || !parsed.isValid || embedError) {
     return (
       <div className={`flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300 rounded-2xl ${className}`}>
         <AlertCircle className="w-10 h-10 text-amber-400 mb-2.5" />
@@ -30,9 +31,9 @@ export default function EmbeddedVideoPlayer({
         <p className="text-xs text-slate-400 max-w-sm mb-4">
           The creator or social platform may have set privacy, age, or embed restrictions on this media item.
         </p>
-        {videoUrl && (
+        {safeVideoUrl ? (
           <a
-            href={videoUrl}
+            href={safeVideoUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold rounded-xl border border-slate-700 transition-colors"
@@ -40,17 +41,25 @@ export default function EmbeddedVideoPlayer({
             <ExternalLink className="w-3.5 h-3.5" />
             <span>Open Link in New Tab</span>
           </a>
-        )}
+        ) : null}
       </div>
     );
   }
 
   // 1. Direct HTML5 Video Player
-  if (parsed.platform === 'direct' || videoUrl.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i) || videoUrl.startsWith('blob:') || videoUrl.includes('/storage/')) {
+  const isDirectVideo =
+    parsed.platform === 'direct' ||
+    Boolean(
+      safeVideoUrl.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i) ||
+      safeVideoUrl.startsWith('blob:') ||
+      safeVideoUrl.includes('/storage/')
+    );
+
+  if (isDirectVideo) {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
         <video
-          src={videoUrl}
+          src={safeVideoUrl}
           controls
           autoPlay={autoPlay}
           poster={thumbnailUrl || undefined}

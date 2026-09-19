@@ -4,6 +4,7 @@ import { db } from '../lib/supabase';
 import { VideoItem, getCategoryLabel } from '../types';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import VideoThumbnail from '../components/VideoThumbnail';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { Play, Calendar, Eye, Sparkles, X, MessageSquare, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -97,27 +98,31 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
     fetchVideos();
   }, []);
 
-  const categories = ['All', ...Array.from(new Set(videos.map(v => v.category)))];
+  const categories = ['All', ...Array.from(new Set(videos.map(v => v?.category || 'General').filter(Boolean)))];
 
   const filteredVideos = videos.filter(v => {
+    if (!v) return false;
     return selectedFilter === 'All' || v.category === selectedFilter;
   });
 
   // Safe helper to extract Youtube ID or embed URL cleanly
-  const getEmbedUrl = (url: string) => {
+  const getEmbedUrl = (url?: string | null) => {
+    if (!url || typeof url !== 'string') return '';
     if (url.includes('embed/')) return url;
     // Extract video ID if standard youtube link
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
-    if (match && match[2].length === 11) {
+    if (match && match[2] && match[2].length === 11) {
       return `https://www.youtube.com/embed/${match[2]}`;
     }
     return url;
   };
 
-  const formattedWhatsappLink = (title: string) => {
-    const msg = `Hello MOBO SAVIOR, I watched your video on "${title}" and want to enquire about booking a similar repair.`;
-    return `https://wa.me/91${contactWhatsapp.replace(/\s+/g, '')}?text=${encodeURIComponent(msg)}`;
+  const formattedWhatsappLink = (title?: string) => {
+    const safeTitle = title || 'a repair video';
+    const msg = `Hello MOBO SAVIOR, I watched your video on "${safeTitle}" and want to enquire about booking a similar repair.`;
+    const cleanWhatsapp = (contactWhatsapp || '081675 49092').replace(/\s+/g, '');
+    return `https://wa.me/91${cleanWhatsapp}?text=${encodeURIComponent(msg)}`;
   };
 
   return (
@@ -169,13 +174,15 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
                 onClick={() => setActiveVideo(vid)}
                 className="relative cursor-pointer group"
               >
-                <VideoThumbnail
-                  videoUrl={vid.videoUrl}
-                  thumbnailUrl={vid.thumbnailUrl}
-                  title={vid.title}
-                  aspectRatio="video"
-                  showPlayButton={true}
-                />
+                <ErrorBoundary componentName="Video Card Thumbnail">
+                  <VideoThumbnail
+                    videoUrl={vid.videoUrl}
+                    thumbnailUrl={vid.thumbnailUrl}
+                    title={vid.title}
+                    aspectRatio="video"
+                    showPlayButton={true}
+                  />
+                </ErrorBoundary>
 
                 <span className="absolute bottom-4 left-4 px-2.5 py-0.5 bg-black/60 backdrop-blur-sm text-[9px] font-extrabold text-white rounded-lg uppercase tracking-wider z-10">
                   {vid.category}
@@ -238,12 +245,14 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
 
               {/* Player wrapper */}
               <div className="relative min-h-[320px] max-h-[80vh] bg-black w-full flex items-center justify-center overflow-hidden">
-                <EmbeddedVideoPlayer
-                  videoUrl={activeVideo.videoUrl}
-                  title={activeVideo.title}
-                  thumbnailUrl={activeVideo.thumbnailUrl}
-                  autoPlay={true}
-                />
+                <ErrorBoundary componentName="Video Player Overlay">
+                  <EmbeddedVideoPlayer
+                    videoUrl={activeVideo.videoUrl}
+                    title={activeVideo.title}
+                    thumbnailUrl={activeVideo.thumbnailUrl}
+                    autoPlay={true}
+                  />
+                </ErrorBoundary>
               </div>
 
               {/* Bottom Info bar */}

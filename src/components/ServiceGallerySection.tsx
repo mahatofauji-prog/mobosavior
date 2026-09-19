@@ -5,6 +5,7 @@ import { GalleryItem } from '../types';
 import BeforeAfterSlider from './BeforeAfterSlider';
 import VideoThumbnail from './VideoThumbnail';
 import EmbeddedVideoPlayer from './EmbeddedVideoPlayer';
+import ErrorBoundary from './ErrorBoundary';
 import { Sparkles, Eye, Play, ArrowRight, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -108,13 +109,15 @@ export default function ServiceGallerySection({
                     onClick={() => setActiveMediaModal(item)}
                     className="relative cursor-pointer group"
                   >
-                    <VideoThumbnail
-                      videoUrl={item.videoUrl}
-                      thumbnailUrl={item.thumbnailUrl || item.imageUrl}
-                      title={item.title}
-                      aspectRatio="4/3"
-                      showPlayButton={true}
-                    />
+                    <ErrorBoundary componentName="Service Video Thumbnail">
+                      <VideoThumbnail
+                        videoUrl={item.videoUrl}
+                        thumbnailUrl={item.thumbnailUrl || item.imageUrl}
+                        title={item.title}
+                        aspectRatio="4/3"
+                        showPlayButton={true}
+                      />
+                    </ErrorBoundary>
                   </div>
                 ) : (
                   <div
@@ -177,13 +180,15 @@ export default function ServiceGallerySection({
 
               {activeMediaModal.mediaType === 'video' && activeMediaModal.videoUrl ? (
                 <div className="relative w-full min-h-[300px] max-h-[75vh] bg-black rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
-                  <EmbeddedVideoPlayer
-                    videoUrl={activeMediaModal.videoUrl}
-                    title={activeMediaModal.title}
-                    thumbnailUrl={activeMediaModal.thumbnailUrl || activeMediaModal.imageUrl}
-                    autoPlay={true}
-                    className="w-full h-full"
-                  />
+                  <ErrorBoundary componentName="Service Video Player">
+                    <EmbeddedVideoPlayer
+                      videoUrl={activeMediaModal.videoUrl}
+                      title={activeMediaModal.title}
+                      thumbnailUrl={activeMediaModal.thumbnailUrl || activeMediaModal.imageUrl}
+                      autoPlay={true}
+                      className="w-full h-full"
+                    />
+                  </ErrorBoundary>
                 </div>
               ) : (
                 <div className="rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-slate-800 max-h-[60vh]">

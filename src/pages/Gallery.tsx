@@ -5,6 +5,7 @@ import { GalleryItem, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } fr
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import VideoThumbnail from '../components/VideoThumbnail';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { getVideoPlatformLabel } from '../lib/videoUtils';
 import { Eye, Calendar, Sparkles, X, MessageSquare, AlertCircle, Play, Search, Filter, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -54,25 +55,34 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
 
   // Filter logic
   const filteredItems = items.filter((item) => {
+    if (!item) return false;
     const targetCategory = selectedCategory === 'All' ? 'All' : mapCategoryToId(selectedCategory);
     const itemCatId = mapCategoryToId(item.category);
     const matchesCategory =
       targetCategory === 'All' ||
       itemCatId === targetCategory;
 
+    const queryStr = searchQuery.trim().toLowerCase();
+    const itemTitle = (item.title || '').toLowerCase();
+    const itemDesc = (item.description || '').toLowerCase();
+    const itemBrand = (item.brand || '').toLowerCase();
+    const itemModel = (item.model || '').toLowerCase();
+
     const matchesSearch =
-      !searchQuery.trim() ||
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.model && item.model.toLowerCase().includes(searchQuery.toLowerCase()));
+      !queryStr ||
+      itemTitle.includes(queryStr) ||
+      itemDesc.includes(queryStr) ||
+      itemBrand.includes(queryStr) ||
+      itemModel.includes(queryStr);
 
     return matchesCategory && matchesSearch;
   });
 
-  const formattedWhatsappLink = (title: string) => {
-    const msg = `Hello MOBO SAVIOR, I saw your work on "${title}" in your gallery and want to consult on a similar repair.`;
-    return `https://wa.me/91${contactWhatsapp.replace(/\s+/g, '')}?text=${encodeURIComponent(msg)}`;
+  const formattedWhatsappLink = (title?: string) => {
+    const safeTitle = title || 'a repair';
+    const msg = `Hello MOBO SAVIOR, I saw your work on "${safeTitle}" in your gallery and want to consult on a similar repair.`;
+    const cleanWhatsapp = (contactWhatsapp || '081675 49092').replace(/\s+/g, '');
+    return `https://wa.me/91${cleanWhatsapp}?text=${encodeURIComponent(msg)}`;
   };
 
   return (
@@ -174,13 +184,15 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
                     onClick={() => setActiveItem(item)}
                     className="relative cursor-pointer group overflow-hidden"
                   >
-                    <VideoThumbnail
-                      videoUrl={item.videoUrl}
-                      thumbnailUrl={item.thumbnailUrl || item.imageUrl}
-                      title={item.title}
-                      aspectRatio="4/3"
-                      showPlayButton={true}
-                    />
+                    <ErrorBoundary componentName="Gallery Video Thumbnail">
+                      <VideoThumbnail
+                        videoUrl={item.videoUrl}
+                        thumbnailUrl={item.thumbnailUrl || item.imageUrl}
+                        title={item.title}
+                        aspectRatio="4/3"
+                        showPlayButton={true}
+                      />
+                    </ErrorBoundary>
                   </div>
                 ) : (
                   <div
@@ -306,12 +318,14 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
               <div className="md:w-3/5 bg-black flex items-center justify-center relative min-h-[300px] md:min-h-0">
                 {activeItem.mediaType === 'video' && activeItem.videoUrl ? (
                   <div className="w-full h-full relative aspect-video flex items-center justify-center">
-                    <EmbeddedVideoPlayer
-                      videoUrl={activeItem.videoUrl}
-                      title={activeItem.title}
-                      thumbnailUrl={activeItem.thumbnailUrl || activeItem.imageUrl}
-                      className="w-full h-full"
-                    />
+                    <ErrorBoundary componentName="Gallery Video Player">
+                      <EmbeddedVideoPlayer
+                        videoUrl={activeItem.videoUrl}
+                        title={activeItem.title}
+                        thumbnailUrl={activeItem.thumbnailUrl || activeItem.imageUrl}
+                        className="w-full h-full"
+                      />
+                    </ErrorBoundary>
                   </div>
                 ) : activeItem.mediaType === 'before_after' && activeItem.beforeImageUrl && activeItem.afterImageUrl ? (
                   <div className="w-full p-4">

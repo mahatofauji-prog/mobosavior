@@ -95,7 +95,37 @@ export default function AdminBranches() {
       if (branchErr) {
         console.error('Error fetching branches:', branchErr);
       } else if (branchData && branchData.length > 0) {
-        setBranches(branchData as Branch[]);
+        const mappedBranches: Branch[] = branchData.map((b: any) => {
+          const meta = b.businessHours?._meta || b.business_hours?._meta || {};
+          return {
+            id: b.id,
+            name: b.name || '',
+            slug: b.slug || b.id,
+            branchCode: b.branchCode || b.branch_code || '',
+            address: b.address || '',
+            city: b.city || 'Purulia',
+            state: b.state || 'West Bengal',
+            pincode: b.pincode || '',
+            googleMapsUrl: b.googleMapsUrl || b.google_maps_url || '',
+            latitude: b.latitude !== null && b.latitude !== undefined ? Number(b.latitude) : undefined,
+            longitude: b.longitude !== null && b.longitude !== undefined ? Number(b.longitude) : undefined,
+            phone: b.phone || '',
+            whatsapp: b.whatsapp || '',
+            email: b.email || '',
+            weeklyHoliday: meta.weeklyHoliday || 'None (Open All 7 Days)',
+            businessHours: b.businessHours || b.business_hours || DEFAULT_HOURS,
+            description: meta.description || '',
+            imageUrl: meta.imageUrl || '/assets/images/why_choose_mobo_savior.png',
+            serviceIds: meta.serviceIds || [],
+            isMain: !!(b.isHeadquarters || b.is_headquarters || meta.isMain),
+            isFeatured: meta.isFeatured !== undefined ? meta.isFeatured : true,
+            isActive: meta.isActive !== undefined ? meta.isActive : true,
+            displayOrder: b.displayOrder || b.display_order || 1,
+            seoTitle: meta.seoTitle || '',
+            seoDescription: meta.seoDescription || ''
+          };
+        });
+        setBranches(mappedBranches);
       } else {
         setBranches(DEFAULT_BRANCHES);
       }
@@ -206,14 +236,31 @@ export default function AdminBranches() {
     const finalSlug = formState.slug.trim() || formState.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const branchId = editingBranch ? editingBranch.id : `branch-${Date.now()}`;
 
-    // If this branch is marked as main, remove isMain from other branches
+    // If this branch is marked as main, remove isHeadquarters from other branches
     if (formState.isMain) {
       for (const b of branches) {
         if (b.id !== branchId && b.isMain) {
-          await supabase.from('branches').update({ isMain: false, is_main: false }).eq('id', b.id);
+          await supabase.from('branches').update({ isHeadquarters: false, is_headquarters: false }).eq('id', b.id);
         }
       }
     }
+
+    const metaObj = {
+      description: formState.description.trim(),
+      imageUrl: formState.imageUrl.trim() || '/assets/images/why_choose_mobo_savior.png',
+      weeklyHoliday: formState.weeklyHoliday.trim(),
+      serviceIds: formState.serviceIds,
+      isMain: !!formState.isMain,
+      isFeatured: !!formState.isFeatured,
+      isActive: !!formState.isActive,
+      seoTitle: formState.seoTitle.trim() || `${formState.name} | MOBO SAVIOR`,
+      seoDescription: formState.seoDescription.trim() || `${formState.name} - ${formState.address}, ${formState.city}`
+    };
+
+    const businessHoursWithMeta = {
+      ...(typeof formState.businessHours === 'object' && formState.businessHours !== null ? formState.businessHours : DEFAULT_HOURS),
+      _meta: metaObj
+    };
 
     const payload: any = {
       id: branchId,
@@ -222,9 +269,9 @@ export default function AdminBranches() {
       branchCode: formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`,
       branch_code: formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`,
       address: formState.address.trim(),
-      city: formState.city.trim(),
-      state: formState.state.trim(),
-      pincode: formState.pincode.trim(),
+      city: formState.city.trim() || 'Purulia',
+      state: formState.state.trim() || 'West Bengal',
+      pincode: formState.pincode.trim() || '723101',
       googleMapsUrl: formState.googleMapsUrl.trim(),
       google_maps_url: formState.googleMapsUrl.trim(),
       latitude: formState.latitude !== '' ? parseFloat(formState.latitude) : null,
@@ -232,31 +279,12 @@ export default function AdminBranches() {
       phone: formState.phone.trim(),
       whatsapp: formState.whatsapp.trim(),
       email: formState.email.trim() || null,
-      weeklyHoliday: formState.weeklyHoliday.trim(),
-      weekly_holiday: formState.weeklyHoliday.trim(),
-      businessHours: formState.businessHours,
-      business_hours: formState.businessHours,
-      description: formState.description.trim(),
-      imageUrl: formState.imageUrl.trim() || null,
-      image_url: formState.imageUrl.trim() || null,
-      serviceIds: formState.serviceIds,
-      service_ids: formState.serviceIds,
-      isMain: !!formState.isMain,
-      is_main: !!formState.isMain,
-      isFeatured: !!formState.isFeatured,
-      is_featured: !!formState.isFeatured,
-      isActive: !!formState.isActive,
-      is_active: !!formState.isActive,
+      businessHours: businessHoursWithMeta,
+      business_hours: businessHoursWithMeta,
+      isHeadquarters: !!formState.isMain,
+      is_headquarters: !!formState.isMain,
       displayOrder: Number(formState.displayOrder) || 1,
-      display_order: Number(formState.displayOrder) || 1,
-      seoTitle: formState.seoTitle.trim() || `${formState.name} | MOBO SAVIOR`,
-      seo_title: formState.seoTitle.trim() || `${formState.name} | MOBO SAVIOR`,
-      seoDescription: formState.seoDescription.trim() || `${formState.name} - ${formState.address}, ${formState.city}`,
-      seo_description: formState.seoDescription.trim() || `${formState.name} - ${formState.address}, ${formState.city}`,
-      createdAt: editingBranch?.createdAt || new Date().toISOString(),
-      created_at: editingBranch?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      display_order: Number(formState.displayOrder) || 1
     };
 
     try {
@@ -273,7 +301,19 @@ export default function AdminBranches() {
 
   const handleToggleActive = async (branch: Branch) => {
     try {
-      const { error } = await supabase.from('branches').update({ isActive: !branch.isActive, is_active: !branch.isActive }).eq('id', branch.id);
+      const currentHours: any = branch.businessHours || {};
+      const currentMeta = currentHours._meta || {};
+      const updatedBusinessHours = {
+        ...currentHours,
+        _meta: {
+          ...currentMeta,
+          isActive: !branch.isActive
+        }
+      };
+      const { error } = await supabase.from('branches').update({
+        businessHours: updatedBusinessHours,
+        business_hours: updatedBusinessHours
+      }).eq('id', branch.id);
       if (error) throw error;
       fetchData();
     } catch (err) {
@@ -284,7 +324,10 @@ export default function AdminBranches() {
   const handleSetMainBranch = async (targetBranch: Branch) => {
     try {
       for (const b of branches) {
-        await supabase.from('branches').update({ isMain: b.id === targetBranch.id, is_main: b.id === targetBranch.id }).eq('id', b.id);
+        await supabase.from('branches').update({
+          isHeadquarters: b.id === targetBranch.id,
+          is_headquarters: b.id === targetBranch.id
+        }).eq('id', b.id);
       }
       fetchData();
     } catch (err) {

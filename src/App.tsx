@@ -337,7 +337,20 @@ export default function App() {
         if (branchesRes.status === 'fulfilled') {
           const fetchedBranches: Branch[] = [];
           branchesRes.value.forEach(docSnap => {
-            fetchedBranches.push({ id: docSnap.id, ...docSnap.data() } as Branch);
+            const raw: any = { id: docSnap.id, ...docSnap.data() };
+            const meta = raw.businessHours?._meta || raw.business_hours?._meta || {};
+            fetchedBranches.push({
+              ...raw,
+              isMain: raw.isMain !== undefined ? raw.isMain : !!(raw.isHeadquarters || raw.is_headquarters || meta.isMain),
+              isActive: raw.isActive !== undefined ? raw.isActive : (meta.isActive !== undefined ? meta.isActive : true),
+              isFeatured: raw.isFeatured !== undefined ? raw.isFeatured : (meta.isFeatured !== undefined ? meta.isFeatured : true),
+              imageUrl: raw.imageUrl || meta.imageUrl || '/assets/images/why_choose_mobo_savior.png',
+              description: raw.description || meta.description || '',
+              weeklyHoliday: raw.weeklyHoliday || meta.weeklyHoliday || 'None (Open All 7 Days)',
+              serviceIds: raw.serviceIds || meta.serviceIds || [],
+              seoTitle: raw.seoTitle || meta.seoTitle || '',
+              seoDescription: raw.seoDescription || meta.seoDescription || ''
+            } as Branch);
           });
           if (fetchedBranches.length > 0) setBranches(fetchedBranches);
         }

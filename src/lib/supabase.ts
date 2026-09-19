@@ -169,7 +169,7 @@ export async function setDoc(docRef: any, data: any, options?: any) {
     return;
   }
 
-  const payload = { ...data };
+  let payload: any = { ...data };
   if (id) payload.id = id;
 
   // Cache to localStorage for offline persistence / immediate accessibility
@@ -182,6 +182,46 @@ export async function setDoc(docRef: any, data: any, options?: any) {
       localStorage.setItem(storageKey, JSON.stringify(updated.slice(0, 100)));
     }
   } catch {}
+
+  // Strict sanitization for branches table to prevent schema cache mismatch
+  if (col === 'branches') {
+    const metaObj = {
+      description: payload.description || '',
+      imageUrl: payload.imageUrl || '',
+      weeklyHoliday: payload.weeklyHoliday || '',
+      serviceIds: payload.serviceIds || [],
+      isMain: !!(payload.isMain || payload.isHeadquarters),
+      isFeatured: payload.isFeatured !== undefined ? payload.isFeatured : true,
+      isActive: payload.isActive !== undefined ? payload.isActive : true,
+      seoTitle: payload.seoTitle || '',
+      seoDescription: payload.seoDescription || ''
+    };
+    const bHours = typeof payload.businessHours === 'object' && payload.businessHours !== null ? payload.businessHours : {};
+    payload = {
+      id: payload.id,
+      name: payload.name || '',
+      slug: payload.slug || payload.id,
+      branchCode: payload.branchCode || payload.branch_code || '',
+      branch_code: payload.branchCode || payload.branch_code || '',
+      address: payload.address || '',
+      city: payload.city || 'Purulia',
+      state: payload.state || 'West Bengal',
+      pincode: payload.pincode || '723101',
+      googleMapsUrl: payload.googleMapsUrl || payload.google_maps_url || '',
+      google_maps_url: payload.googleMapsUrl || payload.google_maps_url || '',
+      latitude: payload.latitude !== undefined && payload.latitude !== '' && payload.latitude !== null ? parseFloat(payload.latitude) : null,
+      longitude: payload.longitude !== undefined && payload.longitude !== '' && payload.longitude !== null ? parseFloat(payload.longitude) : null,
+      phone: payload.phone || '',
+      whatsapp: payload.whatsapp || '',
+      email: payload.email || null,
+      businessHours: { ...bHours, _meta: metaObj },
+      business_hours: { ...bHours, _meta: metaObj },
+      isHeadquarters: !!(payload.isMain || payload.isHeadquarters),
+      is_headquarters: !!(payload.isMain || payload.isHeadquarters),
+      displayOrder: Number(payload.displayOrder || payload.display_order) || 1,
+      display_order: Number(payload.displayOrder || payload.display_order) || 1
+    };
+  }
   
   const { error } = await (supabase.from(col as any)).upsert(payload);
   if (error) {

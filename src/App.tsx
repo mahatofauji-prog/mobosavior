@@ -185,13 +185,13 @@ export default function App() {
   // Local session state monitors the local admin passcode gate
 
   // Load Database Configurations efficiently in parallel
-  const loadConfigurationData = useCallback(async () => {
-    if (isFetchingRef.current) return;
+  const loadConfigurationData = useCallback(async (force = false) => {
+    if (!force && isFetchingRef.current) return;
     isFetchingRef.current = true;
 
-    // Timeout promise to prevent indefinite hanging (safety limit: 5 seconds)
+    // Timeout promise to prevent indefinite hanging (safety limit: 15 seconds)
     const timeoutPromise = new Promise<{ isTimeout: true }>((resolve) =>
-      setTimeout(() => resolve({ isTimeout: true }), 5000)
+      setTimeout(() => resolve({ isTimeout: true }), 15000)
     );
 
     const fetchAllData = async () => {
@@ -384,11 +384,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    seedDatabaseIfEmpty()
-      .catch(() => {})
-      .finally(() => {
-        loadConfigurationData();
-      });
+    loadConfigurationData(true);
   }, [loadConfigurationData]);
 
   const handleCustomNavigate = (route: string) => {

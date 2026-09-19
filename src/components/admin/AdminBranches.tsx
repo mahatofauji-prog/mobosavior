@@ -19,7 +19,11 @@ const DEFAULT_HOURS: WeeklyBusinessHours = {
   sunday: { isOpen: true, openTime: '09:30', closeTime: '20:30' },
 };
 
-export default function AdminBranches() {
+interface AdminBranchesProps {
+  onRefreshData?: () => void;
+}
+
+export default function AdminBranches({ onRefreshData }: AdminBranchesProps) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,6 +323,7 @@ export default function AdminBranches() {
       setEditingBranch(null);
       setFormState(emptyForm);
       await fetchData();
+      if (onRefreshData) onRefreshData();
       alert(isNew ? 'New branch created successfully!' : 'Branch updated successfully!');
     } catch (err: any) {
       console.error('Failed to save branch:', err);
@@ -343,6 +348,7 @@ export default function AdminBranches() {
       }).eq('id', branch.id);
       if (error) throw error;
       fetchData();
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error('Failed to update status:', err);
     }
@@ -357,6 +363,7 @@ export default function AdminBranches() {
         }).eq('id', b.id);
       }
       fetchData();
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error('Failed to update main branch:', err);
     }
@@ -372,6 +379,7 @@ export default function AdminBranches() {
         const { error } = await supabase.from('branches').delete().eq('id', branch.id);
         if (error) throw error;
         await fetchData();
+        if (onRefreshData) onRefreshData();
         alert('Branch deleted successfully.');
       } catch (err: any) {
         console.error('Failed to delete branch:', err);

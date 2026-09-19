@@ -164,6 +164,58 @@ export default function AdminDashboard({
   }, [servicesList]);
 
   useEffect(() => {
+    if (brandingSettings) {
+      if (brandingSettings.brandName !== undefined) setBrandName(brandingSettings.brandName);
+      if (brandingSettings.logoUrl !== undefined) setLogoUrl(brandingSettings.logoUrl);
+      if (brandingSettings.tagline !== undefined) setTagline(brandingSettings.tagline);
+    }
+  }, [brandingSettings]);
+
+  useEffect(() => {
+    if (contactSettings) {
+      if (contactSettings.address !== undefined) setAddress(contactSettings.address);
+      if (contactSettings.phone !== undefined) setPhone(contactSettings.phone);
+      if (contactSettings.whatsapp !== undefined) setWhatsapp(contactSettings.whatsapp);
+      if (contactSettings.facebook !== undefined) setFacebook(contactSettings.facebook);
+      if (contactSettings.instagram !== undefined) setInstagram(contactSettings.instagram);
+      if (contactSettings.youtube !== undefined) setYoutube(contactSettings.youtube);
+      if (contactSettings.whatsappChannelUrl !== undefined) setWhatsappChannelUrl(contactSettings.whatsappChannelUrl);
+      if (contactSettings.googleMapsUrl !== undefined) setMapsUrl(contactSettings.googleMapsUrl);
+      if (contactSettings.mapIframeUrl !== undefined) setMapIframeUrl(contactSettings.mapIframeUrl);
+    }
+  }, [contactSettings]);
+
+  useEffect(() => {
+    if (websiteContent) {
+      if (websiteContent.heroTitle !== undefined) setHeroTitle(websiteContent.heroTitle);
+      if (websiteContent.heroDescription !== undefined) setHeroDesc(websiteContent.heroDescription);
+      if (websiteContent.aboutText !== undefined) setAboutText(websiteContent.aboutText);
+      if (websiteContent.aboutHighlight !== undefined) setAboutHighlight(websiteContent.aboutHighlight);
+    }
+  }, [websiteContent]);
+
+  useEffect(() => {
+    if (seoSettings) {
+      if (seoSettings.siteTitle !== undefined) setSeoTitle(seoSettings.siteTitle);
+      if (seoSettings.metaDescription !== undefined) setSeoDesc(seoSettings.metaDescription);
+      if (seoSettings.searchConsoleVerification !== undefined) setSeoVerification(seoSettings.searchConsoleVerification);
+      if (seoSettings.robotsConfig !== undefined) setSeoRobots(seoSettings.robotsConfig);
+    }
+  }, [seoSettings]);
+
+  useEffect(() => {
+    if (reviewsList && reviewsList.length > 0) {
+      setReviews(reviewsList);
+    }
+  }, [reviewsList]);
+
+  useEffect(() => {
+    if (faqsList && faqsList.length > 0) {
+      setFaqs(faqsList);
+    }
+  }, [faqsList]);
+
+  useEffect(() => {
     if (serviceModal.open) {
       setServiceFormImageUrl(serviceModal.item?.imageUrl || '');
     }
@@ -1556,7 +1608,7 @@ export default function AdminDashboard({
           </div>
         )}
 
-        {activeTab === 'branches' && <AdminBranches />}
+        {activeTab === 'branches' && <AdminBranches onRefreshData={onRefreshData} />}
 
         {activeTab === 'bookings' && <AdminServiceBookings />}
         

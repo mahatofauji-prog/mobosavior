@@ -151,33 +151,40 @@ export default function AdminBranches() {
     fetchData();
   }, []);
 
+  const emptyForm = {
+    name: '',
+    slug: '',
+    branchCode: '',
+    address: '',
+    city: '',
+    state: 'Jharkhand',
+    pincode: '',
+    googleMapsUrl: '',
+    latitude: '',
+    longitude: '',
+    phone: '',
+    whatsapp: '',
+    email: '',
+    weeklyHoliday: 'None (Open All 7 Days)',
+    businessHours: JSON.parse(JSON.stringify(DEFAULT_HOURS)),
+    description: '',
+    imageUrl: '/assets/images/why_choose_mobo_savior.png',
+    serviceIds: [] as string[],
+    isMain: false,
+    isFeatured: true,
+    isActive: true,
+    displayOrder: 1,
+    seoTitle: '',
+    seoDescription: ''
+  };
+
   const handleOpenAddModal = () => {
     setEditingBranch(null);
     setFormState({
-      name: '',
-      slug: '',
-      branchCode: `MS-${branches.length + 1}`,
-      address: '',
-      city: 'Purulia',
-      state: 'West Bengal',
-      pincode: '723101',
-      googleMapsUrl: '',
-      latitude: '',
-      longitude: '',
-      phone: '',
-      whatsapp: '',
-      email: '',
-      weeklyHoliday: 'None (Open All 7 Days)',
-      businessHours: DEFAULT_HOURS,
-      description: '',
-      imageUrl: '/assets/images/why_choose_mobo_savior.png',
-      serviceIds: [],
-      isMain: branches.length === 0,
-      isFeatured: true,
-      isActive: true,
-      displayOrder: branches.length + 1,
-      seoTitle: '',
-      seoDescription: ''
+      ...emptyForm,
+      branchCode: `MS-0${branches.length + 1}`,
+      serviceIds: services.map(s => s.id),
+      displayOrder: branches.length > 0 ? Math.max(...branches.map(b => b.displayOrder || 1)) + 1 : 1
     });
     setActiveFormTab('basic');
     setIsModalOpen(true);
@@ -190,23 +197,23 @@ export default function AdminBranches() {
       slug: branch.slug || '',
       branchCode: branch.branchCode || '',
       address: branch.address || '',
-      city: branch.city || 'Purulia',
-      state: branch.state || 'West Bengal',
+      city: branch.city || '',
+      state: branch.state || '',
       pincode: branch.pincode || '',
       googleMapsUrl: branch.googleMapsUrl || '',
-      latitude: branch.latitude !== undefined ? String(branch.latitude) : '',
-      longitude: branch.longitude !== undefined ? String(branch.longitude) : '',
+      latitude: branch.latitude !== undefined && branch.latitude !== null ? String(branch.latitude) : '',
+      longitude: branch.longitude !== undefined && branch.longitude !== null ? String(branch.longitude) : '',
       phone: branch.phone || '',
       whatsapp: branch.whatsapp || '',
       email: branch.email || '',
       weeklyHoliday: branch.weeklyHoliday || 'None (Open All 7 Days)',
-      businessHours: branch.businessHours || DEFAULT_HOURS,
+      businessHours: JSON.parse(JSON.stringify(branch.businessHours || DEFAULT_HOURS)),
       description: branch.description || '',
-      imageUrl: branch.imageUrl || '',
-      serviceIds: branch.serviceIds || [],
+      imageUrl: branch.imageUrl || '/assets/images/why_choose_mobo_savior.png',
+      serviceIds: [...(branch.serviceIds || [])],
       isMain: !!branch.isMain,
-      isFeatured: !!branch.isFeatured,
-      isActive: !!branch.isActive,
+      isFeatured: branch.isFeatured !== undefined ? branch.isFeatured : true,
+      isActive: branch.isActive !== undefined ? branch.isActive : true,
       displayOrder: branch.displayOrder || 1,
       seoTitle: branch.seoTitle || '',
       seoDescription: branch.seoDescription || ''
@@ -233,14 +240,21 @@ export default function AdminBranches() {
       return;
     }
 
-    const finalSlug = formState.slug.trim() || formState.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    const branchId = editingBranch ? editingBranch.id : `branch-${Date.now()}`;
+    const finalSlug = formState.slug.trim() || formState.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const isNew = !editingBranch;
+    const branchId = editingBranch ? editingBranch.id : `branch_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    // If this branch is marked as main, remove isHeadquarters from other branches
+    // If this branch is marked as main headquarters, remove headquarters from other branches
     if (formState.isMain) {
       for (const b of branches) {
         if (b.id !== branchId && b.isMain) {
-          await supabase.from('branches').update({ isHeadquarters: false, is_headquarters: false }).eq('id', b.id);
+          const otherHours = { ...(b.businessHours || {}), _meta: { ...(b.businessHours as any)?._meta, isMain: false } };
+          await supabase.from('branches').update({
+            isHeadquarters: false,
+            is_headquarters: false,
+            businessHours: otherHours,
+            business_hours: otherHours
+          }).eq('id', b.id);
         }
       }
     }
@@ -258,19 +272,22 @@ export default function AdminBranches() {
     };
 
     const businessHoursWithMeta = {
-      ...(typeof formState.businessHours === 'object' && formState.businessHours !== null ? formState.businessHours : DEFAULT_HOURS),
+      ...(typeof formState.businessHours === 'object' && formState.businessHours !== null 
+        ? JSON.parse(JSON.stringify(formState.businessHours)) 
+        : JSON.parse(JSON.stringify(DEFAULT_HOURS))),
       _meta: metaObj
     };
 
-    const payload: any = {
+    const uniqueBranchCode = formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`;
+    const branchPayload: any = {
       id: branchId,
       name: formState.name.trim(),
       slug: finalSlug,
-      branchCode: formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`,
-      branch_code: formState.branchCode.trim() || `MS-${Date.now().toString().slice(-4)}`,
+      branchCode: uniqueBranchCode,
+      branch_code: uniqueBranchCode,
       address: formState.address.trim(),
-      city: formState.city.trim() || 'Purulia',
-      state: formState.state.trim() || 'West Bengal',
+      city: formState.city.trim() || 'Ranchi',
+      state: formState.state.trim() || 'Jharkhand',
       pincode: formState.pincode.trim() || '723101',
       googleMapsUrl: formState.googleMapsUrl.trim(),
       google_maps_url: formState.googleMapsUrl.trim(),
@@ -288,11 +305,21 @@ export default function AdminBranches() {
     };
 
     try {
-      const { error } = await supabase.from('branches').upsert(payload);
-      if (error) throw error;
+      if (isNew) {
+        // STRICT INSERT FOR NEW BRANCH - NEVER OVERWRITE EXISTING
+        const { error } = await supabase.from('branches').insert([branchPayload]);
+        if (error) throw error;
+      } else {
+        // STRICT UPDATE ONLY TARGET BRANCH
+        const { error } = await supabase.from('branches').update(branchPayload).eq('id', editingBranch.id);
+        if (error) throw error;
+      }
+
       setIsModalOpen(false);
+      setEditingBranch(null);
+      setFormState(emptyForm);
       await fetchData();
-      alert('Branch saved successfully!');
+      alert(isNew ? 'New branch created successfully!' : 'Branch updated successfully!');
     } catch (err: any) {
       console.error('Failed to save branch:', err);
       alert('Error saving branch: ' + (err?.message || 'Database error'));
@@ -607,7 +634,11 @@ export default function AdminBranches() {
                 </h3>
               </div>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingBranch(null);
+                  setFormState(emptyForm);
+                }}
                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -1053,7 +1084,11 @@ export default function AdminBranches() {
               <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setEditingBranch(null);
+                    setFormState(emptyForm);
+                  }}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition"
                 >
                   Cancel

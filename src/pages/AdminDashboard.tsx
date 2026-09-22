@@ -1400,7 +1400,7 @@ export default function AdminDashboard({
               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Ready Pickup</span>
                 <p className="text-2xl font-black text-emerald-600 font-sans mt-1">
-                  {bookings.filter(b => b.status === 'Ready for Pickup').length}
+                  {bookings.filter(b => b.status === 'Ready for Pickup' || b.status === 'Ready For Pickup').length}
                 </p>
               </div>
             </div>

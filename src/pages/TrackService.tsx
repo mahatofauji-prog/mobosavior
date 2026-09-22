@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Loader2, FileText, CheckCircle2, Clock, AlertTriangle, Smartphone, Hammer, Truck } from 'lucide-react';
+import { Search, Loader2, FileText, CheckCircle2, Clock, AlertTriangle, Smartphone, Hammer, Truck, XCircle, RotateCcw } from 'lucide-react';
 import { db } from '../lib/supabase';
 import { doc, onSnapshot } from '../lib/supabase';
 
@@ -56,17 +56,56 @@ export default function TrackService({ onNavigate }: TrackServiceProps) {
     setUnsubscribe(() => unsub);
   };
 
-  const statusSteps = [
-    { name: 'Booking Received', icon: FileText },
-    { name: 'Diagnosis', icon: Search },
-    { name: 'Repairing', icon: Hammer },
-    { name: 'Testing', icon: Smartphone },
-    { name: 'Ready for Pickup', icon: CheckCircle2 },
-    { name: 'Delivered', icon: Truck }
+  const sequenceSteps = [
+    { name: 'Booking Received', icon: FileText, description: 'Your device repair request has been logged successfully.' },
+    { name: 'Diagnosis', icon: Search, description: 'Our senior engineers are inspecting your device to find the root cause.' },
+    { name: 'Parts Pending', icon: Clock, description: 'We are waiting for high-quality replacement parts to arrive.' },
+    { name: 'Repairing', icon: Hammer, description: 'Our certified engineers are currently repairing your device.' },
+    { name: 'Testing', icon: Smartphone, description: 'Post-repair diagnostic and quality-control testing in progress.' },
+    { name: 'Ready For Pickup', icon: CheckCircle2, description: 'Your device is fully repaired and ready for pickup.' },
+    { name: 'Delivered', icon: Truck, description: 'Repair completed and device has been safely delivered/picked up.' }
   ];
 
-  const getCurrentStepIndex = (status: string) => {
-    return statusSteps.findIndex(s => s.name === status);
+  const getTimelineSteps = (currentStatus: string) => {
+    const steps = [...sequenceSteps];
+    if (currentStatus === 'Cancelled') {
+      steps.push({
+        name: 'Cancelled',
+        icon: XCircle,
+        description: 'This service request has been cancelled.'
+      });
+    } else if (currentStatus === 'Set Return') {
+      steps.push({
+        name: 'Set Return',
+        icon: RotateCcw,
+        description: 'This device is marked to be returned without repair.'
+      });
+    }
+    return steps;
+  };
+
+  const getStepState = (stepName: string, currentStatus: string) => {
+    if ((stepName === 'Cancelled' && currentStatus === 'Cancelled') || 
+        (stepName === 'Set Return' && currentStatus === 'Set Return')) {
+      return 'current';
+    }
+
+    if (currentStatus === 'Cancelled' || currentStatus === 'Set Return') {
+      if (stepName === 'Booking Received') {
+        return 'completed';
+      }
+      return 'pending';
+    }
+
+    const seqNames = sequenceSteps.map(s => s.name);
+    const currIdx = seqNames.indexOf(currentStatus);
+    const stepIdx = seqNames.indexOf(stepName);
+
+    if (stepIdx === -1) return 'pending';
+
+    if (stepIdx < currIdx) return 'completed';
+    if (stepIdx === currIdx) return 'current';
+    return 'pending';
   };
 
   return (
@@ -161,49 +200,61 @@ export default function TrackService({ onNavigate }: TrackServiceProps) {
                   <div className="absolute left-[21px] top-4 bottom-4 w-0.5 bg-slate-100"></div>
                   
                   <div className="space-y-6 relative">
-                    {statusSteps.map((step, index) => {
-                      const currentIndex = getCurrentStepIndex(trackingData.status);
-                      const isCompleted = index <= currentIndex;
-                      const isCurrent = index === currentIndex;
-                      const isCancelled = trackingData.status === 'Cancelled';
+                    {getTimelineSteps(trackingData.status).map((step) => {
+                      const state = getStepState(step.name, trackingData.status);
                       const Icon = step.icon;
 
-                      if (isCancelled && index > 0) return null;
-
                       return (
-                        <div key={step.name} className={`flex items-start gap-4 ${!isCompleted && !isCancelled ? 'opacity-40 grayscale' : ''}`}>
-                          <div className={`w-11 h-11 rounded-full flex items-center justify-center relative z-10 flex-shrink-0 transition-colors ${
-                            isCancelled 
-                              ? 'bg-rose-100 text-rose-600 border-2 border-rose-200'
-                              : isCurrent 
-                                ? 'bg-[#0284C7] text-white shadow-md' 
-                                : isCompleted 
-                                  ? 'bg-sky-100 text-[#0284C7]' 
-                                  : 'bg-slate-100 text-slate-400'
+                        <div 
+                          key={step.name} 
+                          className={`flex items-start gap-4 transition-all duration-300 ${
+                            state === 'pending' ? 'opacity-40 grayscale' : ''
+                          }`}
+                        >
+                          <div className={`w-11 h-11 rounded-full flex items-center justify-center relative z-10 flex-shrink-0 border transition-all duration-300 ${
+                            state === 'completed'
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                              : state === 'current'
+                                ? step.name === 'Cancelled'
+                                  ? 'bg-rose-50 text-rose-600 border-rose-200 shadow-sm animate-pulse'
+                                  : step.name === 'Set Return'
+                                    ? 'bg-slate-100 text-slate-700 border-slate-300 shadow-sm animate-pulse'
+                                    : 'bg-[#0284C7] text-white border-[#0284C7] shadow-md'
+                                : 'bg-slate-50 text-slate-400 border-slate-200'
                           }`}>
-                            {isCancelled && isCurrent ? <AlertTriangle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                            <Icon className="w-5 h-5" />
                           </div>
+                          
                           <div className="pt-2.5">
-                            <h4 className={`text-sm font-bold ${
-                              isCancelled 
-                                ? 'text-rose-700'
-                                : isCurrent 
-                                  ? 'text-[#0284C7]' 
+                            <h4 className={`text-sm font-bold tracking-tight ${
+                              state === 'completed'
+                                ? 'text-emerald-800'
+                                : state === 'current'
+                                  ? step.name === 'Cancelled'
+                                    ? 'text-rose-700'
+                                    : step.name === 'Set Return'
+                                      ? 'text-slate-800'
+                                      : 'text-[#0284C7]'
                                   : 'text-slate-700'
                             }`}>
-                              {isCancelled && isCurrent ? 'Cancelled' : step.name}
+                              {step.name}
+                              {state === 'completed' && (
+                                <span className="ml-2 text-xs font-semibold text-emerald-600 bg-emerald-100/50 px-1.5 py-0.5 rounded-md">✓ Completed</span>
+                              )}
+                              {state === 'current' && (
+                                <span className={`ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-md ${
+                                  step.name === 'Cancelled'
+                                    ? 'text-rose-600 bg-rose-100'
+                                    : step.name === 'Set Return'
+                                      ? 'text-slate-700 bg-slate-200'
+                                      : 'text-[#0284C7] bg-sky-100'
+                                }`}>● Current</span>
+                              )}
                             </h4>
-                            {isCurrent && (
-                              <p className="text-xs text-slate-500 font-medium mt-1">
-                                {isCancelled 
-                                  ? 'This service request has been cancelled.' 
-                                  : trackingData.status === 'Ready for Pickup'
-                                    ? 'Your device is ready for pickup.'
-                                    : trackingData.status === 'Delivered'
-                                      ? 'Repair completed and device delivered.'
-                                      : 'Currently at this stage.'}
-                              </p>
-                            )}
+                            
+                            <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                              {state === 'current' ? step.description : (state === 'completed' ? 'Successfully processed.' : 'Pending progression.')}
+                            </p>
                           </div>
                         </div>
                       );

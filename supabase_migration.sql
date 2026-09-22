@@ -542,4 +542,72 @@ CREATE POLICY "Public Update Access" ON storage.objects FOR UPDATE USING (true) 
 DROP POLICY IF EXISTS "Public Delete Access" ON storage.objects;
 CREATE POLICY "Public Delete Access" ON storage.objects FOR DELETE USING (true);
 
+-- =========================================================================
+-- REPAIR TRACKING STATUS SYSTEM UPDATE MIGRATION
+-- Normalizes existing statuses and adds check constraints for the 9 statuses
+-- =========================================================================
+
+-- 1. Safely normalize and migrate existing status values in public.service_bookings
+UPDATE public.service_bookings
+SET status = CASE 
+    WHEN status IS NULL OR status = '' THEN 'Booking Received'
+    WHEN status IN ('New Request', 'Pending', 'Request Confirmed', 'Device Received') THEN 'Booking Received'
+    WHEN status IN ('Diagnosis in Progress', 'Diagnosis') THEN 'Diagnosis'
+    WHEN status IN ('Repair in Progress', 'Repairing', 'In Progress') THEN 'Repairing'
+    WHEN status IN ('Testing') THEN 'Testing'
+    WHEN status IN ('Ready for Pickup', 'Ready for pickup', 'Ready for Delivery', 'Ready For Delivery') THEN 'Ready For Pickup'
+    WHEN status IN ('Delivered', 'Completed') THEN 'Delivered'
+    WHEN status IN ('Cancelled') THEN 'Cancelled'
+    WHEN status IN ('Set Return') THEN 'Set Return'
+    ELSE 'Booking Received'
+END;
+
+-- 2. Safely normalize and migrate existing status values in public.service_bookings_public
+UPDATE public.service_bookings_public
+SET status = CASE 
+    WHEN status IS NULL OR status = '' THEN 'Booking Received'
+    WHEN status IN ('New Request', 'Pending', 'Request Confirmed', 'Device Received') THEN 'Booking Received'
+    WHEN status IN ('Diagnosis in Progress', 'Diagnosis') THEN 'Diagnosis'
+    WHEN status IN ('Repair in Progress', 'Repairing', 'In Progress') THEN 'Repairing'
+    WHEN status IN ('Testing') THEN 'Testing'
+    WHEN status IN ('Ready for Pickup', 'Ready for pickup', 'Ready for Delivery', 'Ready For Delivery') THEN 'Ready For Pickup'
+    WHEN status IN ('Delivered', 'Completed') THEN 'Delivered'
+    WHEN status IN ('Cancelled') THEN 'Cancelled'
+    WHEN status IN ('Set Return') THEN 'Set Return'
+    ELSE 'Booking Received'
+END;
+
+-- 3. Drop existing status check constraints if they exist to avoid conflicts
+ALTER TABLE public.service_bookings DROP CONSTRAINT IF EXISTS service_bookings_status_check;
+ALTER TABLE public.service_bookings_public DROP CONSTRAINT IF EXISTS service_bookings_public_status_check;
+
+-- 4. Add the CHECK constraints to ensure ONLY these exact 9 statuses can be stored
+ALTER TABLE public.service_bookings 
+ADD CONSTRAINT service_bookings_status_check 
+CHECK (status IN (
+    'Booking Received',
+    'Diagnosis',
+    'Parts Pending',
+    'Repairing',
+    'Testing',
+    'Ready For Pickup',
+    'Delivered',
+    'Cancelled',
+    'Set Return'
+));
+
+ALTER TABLE public.service_bookings_public 
+ADD CONSTRAINT service_bookings_public_status_check 
+CHECK (status IN (
+    'Booking Received',
+    'Diagnosis',
+    'Parts Pending',
+    'Repairing',
+    'Testing',
+    'Ready For Pickup',
+    'Delivered',
+    'Cancelled',
+    'Set Return'
+));
+
 COMMIT;

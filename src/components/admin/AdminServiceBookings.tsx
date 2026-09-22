@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ServiceBooking } from '../../types';
+import Toast from '../Toast';
 
 export default function AdminServiceBookings() {
   const [bookings, setBookings] = useState<ServiceBooking[]>([]);
@@ -14,6 +15,7 @@ export default function AdminServiceBookings() {
   
   const [selectedBooking, setSelectedBooking] = useState<ServiceBooking | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const fetchBookings = async () => {
     try {
@@ -76,23 +78,26 @@ export default function AdminServiceBookings() {
   );
 
   const statuses = [
-    'Booking Received', 
-    'Diagnosis', 
-    'Repairing', 
-    'Testing', 
-    'Ready for Pickup', 
-    'Delivered', 
-    'Cancelled'
+    'Booking Received',
+    'Diagnosis',
+    'Parts Pending',
+    'Repairing',
+    'Testing',
+    'Ready For Pickup',
+    'Delivered',
+    'Cancelled',
+    'Set Return'
   ];
 
   const updateStatus = async (newStatus: string) => {
     if (!selectedBooking || updating) return;
     setUpdating(true);
+    setToast(null);
     try {
       const timestamp = new Date().toISOString();
       
       // Update private collection
-      await supabase
+      const { error: errPrivate } = await supabase
         .from('service_bookings')
         .update({ 
           status: newStatus,
@@ -100,8 +105,10 @@ export default function AdminServiceBookings() {
         })
         .eq('id', selectedBooking.id);
 
+      if (errPrivate) throw errPrivate;
+
       // Update public collection
-      await supabase
+      const { error: errPublic } = await supabase
         .from('service_bookings_public')
         .update({
           status: newStatus,
@@ -109,9 +116,23 @@ export default function AdminServiceBookings() {
         })
         .eq('service_id', selectedBooking.service_id);
 
+      if (errPublic) throw errPublic;
+
       // Update general bookings collection
-      const generalStatus = newStatus === 'Booking Received' ? 'Pending' : (newStatus === 'Repairing' || newStatus === 'Diagnosis' ? 'In Progress' : (newStatus === 'Delivered' ? 'Completed' : newStatus));
-      await supabase
+      let generalStatus = 'Pending';
+      if (newStatus === 'Booking Received') {
+        generalStatus = 'Pending';
+      } else if (['Diagnosis', 'Parts Pending', 'Repairing', 'Testing'].includes(newStatus)) {
+        generalStatus = 'In Progress';
+      } else if (newStatus === 'Ready For Pickup') {
+        generalStatus = 'Ready For Pickup';
+      } else if (newStatus === 'Delivered') {
+        generalStatus = 'Completed';
+      } else {
+        generalStatus = newStatus; // 'Cancelled' or 'Set Return'
+      }
+
+      const { error: errGeneral } = await supabase
         .from('bookings')
         .update({
           status: generalStatus,
@@ -119,11 +140,17 @@ export default function AdminServiceBookings() {
         })
         .eq('id', selectedBooking.service_id);
 
+      if (errGeneral) {
+        console.warn('Non-blocking error updating general bookings:', errGeneral);
+      }
+
+      // Update local state and trigger refresh
       setSelectedBooking({ ...selectedBooking, status: newStatus });
       await fetchBookings();
+      setToast({ message: 'Status Updated Successfully', type: 'success' });
     } catch (err: any) {
-      console.error(err);
-      alert('Failed to update status: ' + (err?.message || 'Database error'));
+      console.error('[updateStatus error]:', err);
+      setToast({ message: 'Failed to update status: ' + (err?.message || 'Database error'), type: 'error' });
     } finally {
       setUpdating(false);
     }
@@ -131,14 +158,16 @@ export default function AdminServiceBookings() {
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Booking Received': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'Diagnosis': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'Repairing': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-      case 'Testing': return 'bg-sky-100 text-sky-700 border-sky-200';
-      case 'Ready for Pickup': return 'bg-[#0284C7]/10 text-[#0284C7] border-[#0284C7]/20';
-      case 'Delivered': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'Cancelled': return 'bg-rose-100 text-rose-700 border-rose-200';
-      default: return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+      case 'Booking Received': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'Diagnosis': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'Parts Pending': return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'Repairing': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'Testing': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'Ready For Pickup': return 'bg-sky-50 text-[#0284C7] border-sky-200';
+      case 'Delivered': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'Cancelled': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'Set Return': return 'bg-slate-100 text-slate-700 border-slate-300';
+      default: return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     }
   };
 
@@ -397,6 +426,16 @@ export default function AdminServiceBookings() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
         )}
       </AnimatePresence>
     </div>

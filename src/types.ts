@@ -54,7 +54,21 @@ export interface Service {
   displayOrder: number;
 }
 
-export type BookingStatus = 'Pending' | 'Confirmed' | 'In Progress' | 'Ready for Pickup' | 'Completed' | 'Cancelled';
+export type BookingStatus = 
+  | 'Pending' 
+  | 'Confirmed' 
+  | 'In Progress' 
+  | 'Ready for Pickup' 
+  | 'Ready For Pickup' 
+  | 'Completed' 
+  | 'Cancelled' 
+  | 'Booking Received' 
+  | 'Diagnosis' 
+  | 'Parts Pending' 
+  | 'Repairing' 
+  | 'Testing' 
+  | 'Delivered' 
+  | 'Set Return';
 
 export interface Booking {
   id: string; // MS-YYYY-XXXXX

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Lock, Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { fallbackVerifyAdminPassword } from '../lib/clientCrypto';
+import { supabase } from '../lib/supabase';
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -11,6 +12,36 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const handleResetToDefault = async () => {
+    if (!window.confirm('Are you sure you want to reset the admin password back to default ("Mobofounder@2026")? This will delete the custom password from the database settings.')) {
+      return;
+    }
+    setResetting(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      // Delete admin_auth row from settings table directly via Supabase client (unlocked via RLS disable)
+      const { error: deleteErr } = await supabase
+        .from('settings')
+        .delete()
+        .eq('id', 'admin_auth');
+
+      if (deleteErr) {
+        throw deleteErr;
+      }
+
+      setSuccessMessage('Admin password has been reset to default: "Mobofounder@2026". You can now login with the default password.');
+      setPassword('Mobofounder@2026');
+    } catch (err: any) {
+      console.error('[handleResetToDefault error]:', err);
+      setError(`Failed to reset password: ${err.message || JSON.stringify(err)}`);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +142,13 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
             </div>
           )}
 
+          {successMessage && (
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-sm flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+              <p className="font-bold">{successMessage}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label className="block text-sm font-bold text-slate-700">
@@ -154,6 +192,17 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
               )}
             </button>
           </form>
+
+          <div className="text-center mt-6 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={handleResetToDefault}
+              disabled={resetting}
+              className="text-xs font-bold text-slate-400 hover:text-[#0284C7] transition-colors focus:outline-none cursor-pointer"
+            >
+              {resetting ? 'Resetting...' : 'Forgot Admin Password? Reset to Default'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

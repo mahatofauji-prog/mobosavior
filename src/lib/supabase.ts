@@ -131,6 +131,76 @@ export async function getDoc(docRef: any) {
   }
 }
 
+export async function safeUpsert(tableName: string, payload: any, options?: any): Promise<{ data: any; error: any }> {
+  let currentPayload = Array.isArray(payload) 
+    ? payload.map(p => sanitizePayload(tableName, p))
+    : sanitizePayload(tableName, payload) as Record<string, any>;
+
+  let maxAttempts = 15;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data, error } = options 
+      ? await supabase.from(tableName as any).upsert(currentPayload as any, options)
+      : await supabase.from(tableName as any).upsert(currentPayload as any);
+
+    if (!error) {
+      return { data, error: null };
+    }
+
+    const errMsg = error.message || error.details || error.hint || '';
+    const match = 
+      errMsg.match(/Could not find the '([^']+)' column/i) ||
+      errMsg.match(/column [\\"']?([^\\"'\\s]+)[\\"']? (?:of relation [^ ]+ )?does not exist/i) ||
+      errMsg.match(/has no column named [\\"']?([^\\"'\\s]+)[\\"']?/i);
+
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`[safeUpsert] Table '${tableName}' missing column '${missingCol}'. Stripping and retrying (attempt ${attempt + 1})...`);
+      
+      if (Array.isArray(currentPayload)) {
+        currentPayload.forEach((p: any) => delete p[missingCol]);
+      } else if (typeof currentPayload === 'object' && currentPayload !== null) {
+        delete (currentPayload as any)[missingCol];
+      }
+      continue;
+    }
+
+    return { data: null, error };
+  }
+
+  return { data: null, error: new Error(`Failed to upsert to table '${tableName}' after removing missing columns.`) };
+}
+
+export async function safeUpdate(tableName: string, payload: any, matchCol: string, matchVal: any): Promise<{ data: any; error: any }> {
+  let currentPayload = sanitizePayload(tableName, payload) as Record<string, any>;
+  let maxAttempts = 15;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data, error } = await supabase.from(tableName as any).update(currentPayload).eq(matchCol, matchVal);
+
+    if (!error) {
+      return { data, error: null };
+    }
+
+    const errMsg = error.message || error.details || error.hint || '';
+    const match = 
+      errMsg.match(/Could not find the '([^']+)' column/i) ||
+      errMsg.match(/column [\\"']?([^\\"'\\s]+)[\\"']? (?:of relation [^ ]+ )?does not exist/i) ||
+      errMsg.match(/has no column named [\\"']?([^\\"'\\s]+)[\\"']?/i);
+
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`[safeUpdate] Table '${tableName}' missing column '${missingCol}'. Stripping and retrying (attempt ${attempt + 1})...`);
+      delete currentPayload[missingCol];
+      continue;
+    }
+
+    return { data: null, error };
+  }
+
+  return { data: null, error: new Error(`Failed to update table '${tableName}' after removing missing columns.`) };
+}
+
 export async function setDoc(docRef: any, data: any, options?: any) {
   const parts = docRef.path.split('/');
   const col = parts[0];
@@ -143,7 +213,7 @@ export async function setDoc(docRef: any, data: any, options?: any) {
       value: data,
       updated_at: new Date().toISOString()
     };
-    const { error } = await (supabase.from('settings' as any)).upsert(payload);
+    const { error } = await safeUpsert('settings', payload);
     if (error) {
       console.error(`[Supabase setDoc settings error]:`, error);
       throw error;
@@ -154,10 +224,7 @@ export async function setDoc(docRef: any, data: any, options?: any) {
   let rawPayload: any = { ...data };
   if (id) rawPayload.id = id;
 
-  // Sanitize payload to send strictly clean snake_case columns
-  const cleanPayload = sanitizePayload(col, rawPayload);
-  
-  const { error } = await (supabase.from(col as any)).upsert(cleanPayload);
+  const { error } = await safeUpsert(col, rawPayload);
   if (error) {
     console.error(`[Supabase setDoc ${col} error]:`, error);
     throw error;
@@ -180,8 +247,7 @@ export async function updateDoc(docRef: any, data: any) {
   const col = parts[0];
   const id = parts[1];
   
-  const cleanPayload = sanitizePayload(col, data);
-  const { error } = await supabase.from(col as any).update(cleanPayload).eq('id', id);
+  const { error } = await safeUpdate(col, data, 'id', id);
   if (error) {
     console.error(`[Supabase updateDoc ${col} error]:`, error);
     throw error;

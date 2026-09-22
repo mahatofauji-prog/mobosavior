@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, safeUpsert } from '../../lib/supabase';
 import { TrustPoint } from '../../types';
 import { renderTrustIcon, POPULAR_TRUST_ICONS } from '../../utils/offerHelpers';
 import { DEFAULT_TRUST_POINTS } from '../../lib/seed';
@@ -177,7 +177,7 @@ export default function AdminTrustSection() {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase.from('trust_points').upsert(payload);
+      const { error } = await safeUpsert('trust_points', payload);
       if (error) {
         console.error('[Supabase Trust Point Save Error]:', error);
         throw error;
@@ -218,7 +218,7 @@ export default function AdminTrustSection() {
         statCustomerReviews: configState.statCustomerReviews.trim()
       };
 
-      const { error } = await supabase.from('settings').upsert({
+      const { error } = await safeUpsert('settings', {
         id: 'trust_config',
         data: dataToSave,
         value: dataToSave,

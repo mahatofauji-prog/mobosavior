@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, safeUpsert } from '../../lib/supabase';
 import { sanitizePayload } from '../../lib/dbSanitizer';
 import { uploadMediaFile, deleteMediaFile, compressThumbnailFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
@@ -362,8 +362,7 @@ export default function AdminGalleryManager() {
         created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
-      const cleanGalleryPayload = sanitizePayload('gallery', galleryPayload);
-      const { error: galErr } = await supabase.from('gallery').upsert(cleanGalleryPayload);
+      const { error: galErr } = await safeUpsert('gallery', galleryPayload);
       if (galErr) throw galErr;
 
       // If it's a video, also sync to videos table
@@ -381,8 +380,7 @@ export default function AdminGalleryManager() {
           display_order: Number(displayOrder) || 1,
           created_at: galleryPayload.created_at
         };
-        const cleanVideoPayload = sanitizePayload('videos', videoPayload);
-        const { error: vidErr } = await supabase.from('videos').upsert(cleanVideoPayload);
+        const { error: vidErr } = await safeUpsert('videos', videoPayload);
         if (vidErr) console.warn('Supabase video upsert warning:', vidErr);
       }
 

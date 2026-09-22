@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, safeUpsert } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { Page, PageSection } from '../../types';
 import { 
@@ -271,7 +271,7 @@ export default function AdminPages({ onRefreshData }: AdminPagesProps) {
     };
 
     try {
-      const { error: upsertErr } = await supabase.from('pages').upsert(pagePayload);
+      const { error: upsertErr } = await safeUpsert('pages', pagePayload);
       if (upsertErr) {
         console.error('[Supabase Page Save Error]:', upsertErr);
         throw upsertErr;

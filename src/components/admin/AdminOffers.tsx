@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, safeUpsert, safeUpdate } from '../../lib/supabase';
 import { sanitizePayload } from '../../lib/dbSanitizer';
 import { Offer, OfferCategory, OfferCTAType } from '../../types';
 import { getOfferStatus } from '../../utils/offerHelpers';
@@ -166,8 +166,7 @@ export default function AdminOffers() {
         display_order: Number(offerForm.displayOrder) || 1
       };
 
-      const cleanPayload = sanitizePayload('offers', payload);
-      const { error } = await supabase.from('offers').upsert(cleanPayload);
+      const { error } = await safeUpsert('offers', payload);
       if (error) {
         console.error('[Supabase Offer Save Error]:', error);
         throw error;
@@ -249,10 +248,7 @@ export default function AdminOffers() {
     }
 
     try {
-      const { error } = await supabase
-        .from('offers')
-        .update({ isActive: newActive, is_active: newActive })
-        .eq('id', offer.id);
+      const { error } = await safeUpdate('offers', { is_active: newActive }, 'id', offer.id);
       if (error) throw error;
       await fetchData();
     } catch (err) {
@@ -275,8 +271,8 @@ export default function AdminOffers() {
 
     try {
       await Promise.all([
-        supabase.from('offers').update({ displayOrder: targetOrder, display_order: targetOrder }).eq('id', currentOffer.id),
-        supabase.from('offers').update({ displayOrder: currentOrder, display_order: currentOrder }).eq('id', targetOffer.id)
+        safeUpdate('offers', { display_order: targetOrder }, 'id', currentOffer.id),
+        safeUpdate('offers', { display_order: currentOrder }, 'id', targetOffer.id)
       ]);
       await fetchData();
     } catch (err) {
@@ -298,13 +294,11 @@ export default function AdminOffers() {
         name: categoryForm.name.trim(),
         slug,
         description: categoryForm.description.trim() || '',
-        displayOrder: Number(categoryForm.displayOrder) || 1,
         display_order: Number(categoryForm.displayOrder) || 1,
-        active: categoryForm.active !== false,
         is_active: categoryForm.active !== false
       };
 
-      const { error } = await supabase.from('offer_categories').upsert(catData);
+      const { error } = await safeUpsert('offer_categories', catData);
       if (error) throw error;
 
       setIsCategoryModalOpen(false);

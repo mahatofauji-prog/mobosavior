@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, safeUpsert } from '../../lib/supabase';
 import { sanitizePayload } from '../../lib/dbSanitizer';
 import { uploadMediaFile, compressImageToDataUrl, validateImageFile } from '../../lib/storageUpload';
 import { Review, GoogleReviewsSettings } from '../../types';
@@ -344,8 +344,7 @@ export default function AdminReviewsManager() {
         updated_at: new Date().toISOString()
       };
 
-      const cleanPayload = sanitizePayload('reviews', payload);
-      const { error } = await supabase.from('reviews').upsert(cleanPayload);
+      const { error } = await safeUpsert('reviews', payload);
       if (error) throw error;
 
       await fetchData();

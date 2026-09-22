@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, safeUpsert } from '../../lib/supabase';
 import { uploadMediaFile } from '../../lib/storageUpload';
 import { BlogPost, BlogCategory } from '../../types';
 import { 
@@ -170,7 +170,7 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
         displayOrder: categories.length + 1,
         display_order: categories.length + 1
       };
-      const { error: catErr } = await supabase.from('blog_categories').upsert(payload);
+      const { error: catErr } = await safeUpsert('blog_categories', payload);
       if (catErr) throw catErr;
       setNewCatName('');
       setCatModalOpen(false);
@@ -252,7 +252,7 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
     };
 
     try {
-      const { error: upsertErr } = await supabase.from('blog_posts').upsert(payload);
+      const { error: upsertErr } = await safeUpsert('blog_posts', payload);
       if (upsertErr) {
         console.error('[Supabase Blog Post Save Error]:', upsertErr);
         throw upsertErr;

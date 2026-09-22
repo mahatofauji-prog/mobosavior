@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { Menu, X, Phone, MessageSquare, Calendar, ChevronDown, Wrench, Smartphone, Cpu, ShieldCheck, Layers, MapPin, Navigation, Facebook, Instagram, Megaphone } from 'lucide-react';
 import Logo from './Logo';
 import { AnimatePresence, motion } from 'motion/react';
@@ -18,7 +19,10 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
+  const [pagesDropdownOpen, setPagesDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pagesDropdownRef = useRef<HTMLDivElement>(null);
+  const [customPages, setCustomPages] = useState<{ id: string; title: string; slug: string }[]>([]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,11 +32,34 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close dropdown on outside click
+  // Fetch published custom pages
+  useEffect(() => {
+    const fetchCustomPages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('pages')
+          .select('id, title, slug')
+          .eq('status', 'Published')
+          .order('display_order', { ascending: true });
+        
+        if (!error && data) {
+          setCustomPages(data);
+        }
+      } catch (err) {
+        console.error('Error fetching custom pages for Navbar:', err);
+      }
+    };
+    fetchCustomPages();
+  }, []);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setServicesDropdownOpen(false);
+      }
+      if (pagesDropdownRef.current && !pagesDropdownRef.current.contains(e.target as Node)) {
+        setPagesDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -64,6 +91,7 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
     onNavigate(route);
     setIsOpen(false);
     setServicesDropdownOpen(false);
+    setPagesDropdownOpen(false);
   };
 
   const formattedWhatsappLink = `https://wa.me/91${contact.whatsapp.replace(/\s+/g, '')}?text=Hello%20MOBO%20SAVIOR,%20I%20want%20to%20enquire%20about%20mobile%20repair%20service.`;
@@ -183,6 +211,57 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
               {link.label}
             </button>
           ))}
+
+          {/* Dynamic Custom Pages Dropdown */}
+          {customPages.length > 0 && (
+            <div className="relative" ref={pagesDropdownRef}>
+              <button
+                onClick={() => setPagesDropdownOpen(!pagesDropdownOpen)}
+                onMouseEnter={() => setPagesDropdownOpen(true)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold tracking-normal transition-colors focus:outline-none ${
+                  customPages.some(p => currentRoute === p.slug)
+                    ? 'text-[#0284C7] bg-[#E0F2FE]/50'
+                    : 'text-slate-600 hover:text-[#0284C7] hover:bg-slate-50'
+                }`}
+              >
+                <span>Pages</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${pagesDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {pagesDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    onMouseLeave={() => setPagesDropdownOpen(false)}
+                    className="absolute left-0 top-full mt-1.5 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 overflow-hidden"
+                  >
+                    <div className="px-3 py-2 border-b border-slate-100 mb-1">
+                      <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Information Pages</span>
+                    </div>
+                    <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                      {customPages.map((page) => {
+                        const isActive = currentRoute === page.slug;
+                        return (
+                          <button
+                            key={page.id}
+                            onClick={() => handleLinkClick(page.slug)}
+                            className={`w-full flex items-center p-2.5 rounded-xl text-left transition-colors text-xs font-bold ${
+                              isActive ? 'bg-[#E0F2FE]/60 text-[#0284C7]' : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            {page.title}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </nav>
 
         {/* Actions CTA */}
@@ -354,6 +433,26 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
                     {link.label}
                   </button>
                 ))}
+
+                {/* Mobile Dynamic Custom Pages */}
+                {customPages.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100 mt-2 space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-4 py-1 block">Information Pages</span>
+                    {customPages.map((page) => (
+                      <button
+                        key={page.id}
+                        onClick={() => handleLinkClick(page.slug)}
+                        className={`block w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all focus:outline-none ${
+                          currentRoute === page.slug
+                            ? 'text-[#0284C7] bg-[#E0F2FE]/40'
+                            : 'text-slate-600 hover:text-[#0284C7] hover:bg-slate-50'
+                        }`}
+                      >
+                        {page.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 
                 <div className="border-t border-slate-100 pt-4 mt-2 grid grid-cols-2 gap-2.5">
                   <button

@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { Phone, MessageSquare, Instagram, Facebook, MapPin, Compass, ShieldCheck, Megaphone } from 'lucide-react';
 import Logo from './Logo';
 import { BrandingSettings, ContactSettings, NavigationItem } from '../types';
@@ -16,6 +18,27 @@ export default function Footer({
   branding,
   contact
 }: FooterProps) {
+  const [customPages, setCustomPages] = useState<{ id: string; title: string; slug: string }[]>([]);
+
+  useEffect(() => {
+    const fetchCustomPages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('pages')
+          .select('id, title, slug')
+          .eq('status', 'Published')
+          .order('display_order', { ascending: true });
+        
+        if (!error && data) {
+          setCustomPages(data);
+        }
+      } catch (err) {
+        console.error('Error fetching custom pages for Footer:', err);
+      }
+    };
+    fetchCustomPages();
+  }, []);
+
   const categoriesList = [
     { name: 'iPhone Repair', route: 'iphone-repair' },
     { name: 'Android Repair', route: 'android-repair' },
@@ -183,6 +206,13 @@ export default function Footer({
                   Track My Repair
                 </button>
               </li>
+              {customPages.map((page) => (
+                <li key={page.id}>
+                  <button onClick={() => onNavigate(page.slug)} className="hover:text-[#38BDF8] transition-colors focus:outline-none">
+                    {page.title}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
 

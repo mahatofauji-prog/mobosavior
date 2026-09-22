@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -20,6 +21,39 @@ const PORT = 3000;
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://cynrkcrjcxpyiuagyvxj.supabase.co';
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_63nVtmzyXYHGi1lLJWxwxw_6rY8XeKh';
 const supabaseBackend = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Backend-specific Resilient settings upsert helper
+async function safeUpsertSettings(payload: any) {
+  let currentPayload = { ...payload };
+  const maxAttempts = 10;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data, error } = await supabaseBackend
+      .from('settings')
+      .upsert(currentPayload);
+
+    if (!error) {
+      return { data, error: null };
+    }
+
+    const errMsg = error.message || error.details || error.hint || '';
+    const match = 
+      errMsg.match(/Could not find the '([^']+)' column/i) ||
+      errMsg.match(/column [\\"']?([^\\"'\\s]+)[\\"']? (?:of relation [^ ]+ )?does not exist/i) ||
+      errMsg.match(/has no column named [\\"']?([^\\"'\\s]+)[\\"']?/i);
+
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`[safeUpsertSettings] 'settings' table missing column '${missingCol}'. Stripping and retrying (attempt ${attempt + 1})...`);
+      delete currentPayload[missingCol];
+      continue;
+    }
+
+    return { data: null, error };
+  }
+
+  return { data: null, error: new Error("Failed to upsert settings after removing missing columns.") };
+}
 
 // Salted PBKDF2 Password Hashing Utility
 function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
@@ -136,9 +170,7 @@ app.post('/api/admin/change-password', async (req, res) => {
       updated_at: new Date().toISOString()
     };
 
-    const { error: upsertErr } = await supabaseBackend
-      .from('settings')
-      .upsert(payload);
+    const { error: upsertErr } = await safeUpsertSettings(payload);
 
     if (upsertErr) {
       console.error('[Change Password Supabase Error]:', upsertErr);

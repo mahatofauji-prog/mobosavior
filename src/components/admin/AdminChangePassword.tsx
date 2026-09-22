@@ -75,7 +75,16 @@ export default function AdminChangePassword({ onCancel, onSuccessLogout }: Admin
         })
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('[Change Password Response Parse Error]:', text);
+        setErrorMessage(`Server Error (${response.status}): ${text.substring(0, 100) || 'Invalid response format'}`);
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok || !data.success) {
         setErrorMessage(data.message || 'Current password is incorrect.');

@@ -5,6 +5,7 @@ interface LogoProps {
   className?: string;
   logoUrl?: string;
   brandName?: string;
+  tagline?: string;
   showText?: boolean;
   isDark?: boolean;
 }
@@ -13,11 +14,18 @@ export default function Logo({
   className = 'w-9 h-9 xs:w-10 xs:h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-15 lg:h-15',
   logoUrl = '/assets/images/mobo_savior_logo.png',
   brandName = 'MOBO SAVIOR',
+  tagline = 'PURULIA KA TRUSTED MOBILE REPAIRING SHOP',
   showText = true,
   isDark = false
 }: LogoProps) {
   const [imageError, setImageError] = useState(false);
   const activeLogoUrl = logoUrl && logoUrl.trim() !== '' ? logoUrl : '/assets/images/mobo_savior_logo.png';
+  const displayTagline = tagline || 'PURULIA KA TRUSTED MOBILE REPAIRING SHOP';
+
+  // Split brandName if 2 words (e.g. "MOBO SAVIOR") or render first word + rest
+  const brandWords = (brandName || 'MOBO SAVIOR').trim().split(' ');
+  const firstWord = brandWords[0] || 'MOBO';
+  const restWords = brandWords.slice(1).join(' ') || 'SAVIOR';
 
   // Premium rich RED with a subtle glossy gradient and elegant soft red outer glow
   const moboStyle = {
@@ -79,14 +87,16 @@ export default function Logo({
               style={moboStyle}
               className="font-black text-xs xs:text-sm sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
             >
-              MOBO
+              {firstWord}
             </span>
-            <span 
-              style={saviorStyle}
-              className="font-black text-xs xs:text-sm sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
-            >
-              SAVIOR
-            </span>
+            {restWords && (
+              <span 
+                style={saviorStyle}
+                className="font-black text-xs xs:text-sm sm:text-xl lg:text-2xl tracking-tight font-sans select-none"
+              >
+                {restWords}
+              </span>
+            )}
           </div>
           
           {/* Tagline directly underneath without any thick dark/metallic box - clean, golden and highly readable */}
@@ -95,7 +105,7 @@ export default function Logo({
               style={taglineStyle}
               className="text-[5.5px] xs:text-[6.5px] sm:text-[9px] font-black tracking-wider uppercase leading-tight truncate w-full block"
             >
-              PURULIA KA TRUSTED MOBILE REPAIRING SHOP
+              {displayTagline}
             </span>
           </div>
         </div>

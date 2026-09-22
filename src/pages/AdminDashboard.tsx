@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Calendar, Wrench, Image, Play, Star, HelpCircle, 
   FileText, ShieldAlert, Shield, LogOut, Plus, Edit, Trash2, Check, Search, Filter, 
   AlertCircle, Save, Loader2, Sparkles, SlidersHorizontal, Globe, CheckSquare, X, Eye, Phone, MessageSquare,
-  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink
+  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getServiceImage } from '../utils/serviceImages';
@@ -31,6 +31,7 @@ import AdminMediaLibrary from '../components/admin/AdminMediaLibrary';
 import AdminBranches from '../components/admin/AdminBranches';
 import AdminSections from '../components/admin/AdminSections';
 import AdminAnalyticsDashboard from '../components/admin/AdminAnalyticsDashboard';
+import AdminBrandingBusinessProfile from '../components/admin/AdminBrandingBusinessProfile';
 import ImageUploader from '../components/admin/ImageUploader';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import { parseVideoUrl, getVideoPlatformLabel } from '../lib/videoUtils';
@@ -68,6 +69,7 @@ export default function AdminDashboard({
     | 'prices' | 'gallery' | 'videos' | 'reviews' | 'offers' | 'trust' | 'faq'
     | 'contact' | 'hours' | 'social' | 'maps' | 'content' | 'seo' | 'sections'
     | 'analytics' | 'slideshow' | 'media' | 'pages' | 'blog' | 'navigation' | 'media-library' | 'legal'
+    | 'branding-profile'
   >('dashboard');
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1136,6 +1138,7 @@ export default function AdminDashboard({
     {
       title: 'BUSINESS & CONTACT',
       items: [
+        { id: 'branding-profile' as const, label: 'Branding & Business Profile', icon: Building2 },
         { id: 'contact' as const, label: 'Address & Phone', icon: Phone },
         { id: 'hours' as const, label: 'Business Hours & Holiday', icon: Clock },
         { id: 'social' as const, label: 'Social Media Profiles', icon: Share2 },
@@ -2258,6 +2261,15 @@ export default function AdminDashboard({
               <Save className="w-4 h-4" /> Save Google Maps URL
             </button>
           </div>
+        )}
+
+        {activeTab === 'branding-profile' && (
+          <AdminBrandingBusinessProfile
+            brandingSettings={brandingSettings}
+            contactSettings={contactSettings}
+            websiteContent={websiteContent}
+            onRefreshData={onRefreshData}
+          />
         )}
 
         {activeTab === 'analytics' && (

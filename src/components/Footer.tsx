@@ -48,7 +48,7 @@ export default function Footer({
           {/* Brand Info */}
           <div className="space-y-4">
             <button onClick={() => onNavigate('home')} className="focus:outline-none">
-              <Logo logoUrl={branding.logoUrl} brandName={branding.brandName} isDark={true} />
+              <Logo logoUrl={branding.logoUrl} brandName={branding.brandName} tagline={branding.tagline} isDark={true} />
             </button>
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
               {branding.tagline || 'Expert Mobile Repair & Motherboard Micro-Soldering Specialists'}

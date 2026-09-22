@@ -181,11 +181,38 @@ export interface BrandingSettings {
   logoUrl?: string;
 }
 
+export interface BusinessProfile {
+  id?: string;
+  businessName: string;
+  tagline: string;
+  logoUrl?: string;
+  phone: string;
+  whatsapp: string;
+  email?: string;
+  address: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  bio?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  whatsappChannelUrl?: string;
+  googleMapsUrl?: string;
+  youtubeUrl?: string;
+  mapIframeUrl?: string;
+  updatedAt?: string;
+}
+
 export interface ContactSettings {
   name: string;
   address: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
   phone: string;
   whatsapp: string;
+  email?: string;
+  bio?: string;
   instagram: string;
   googleMapsUrl: string;
   mapIframeUrl?: string;

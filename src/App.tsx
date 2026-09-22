@@ -207,6 +207,7 @@ export default function App() {
           brandingRes,
           contactRes,
           hoursRes,
+          profileRes,
 
           contentRes,
           seoRes,
@@ -226,6 +227,7 @@ export default function App() {
           getDoc(doc(db, 'settings', 'branding')),
           getDoc(doc(db, 'settings', 'contact')),
           getDoc(doc(db, 'settings', 'businessHours')),
+          getDoc(doc(db, 'settings', 'business_profile')),
 
           getDoc(doc(db, 'settings', 'content')),
           getDoc(doc(db, 'settings', 'seo')),
@@ -252,6 +254,34 @@ export default function App() {
             ...rawContact,
             whatsappChannelUrl: rawContact.whatsappChannelUrl || DEFAULT_CONTACT.whatsappChannelUrl
           });
+        }
+        if (profileRes.status === 'fulfilled' && profileRes.value.exists()) {
+          const pData: any = profileRes.value.data();
+          if (pData) {
+            setBranding(prev => ({
+              ...prev,
+              brandName: pData.brand_name || pData.brandName || prev.brandName,
+              logoUrl: pData.logo_url || pData.logoUrl || prev.logoUrl,
+              tagline: pData.tagline || prev.tagline
+            }));
+            setContact(prev => ({
+              ...prev,
+              phone: pData.primary_phone || pData.phone || prev.phone,
+              whatsapp: pData.whatsapp_number || pData.whatsapp || prev.whatsapp,
+              address: pData.full_address || pData.address || prev.address,
+              facebook: pData.facebook_page_url || pData.facebook || prev.facebook,
+              instagram: pData.instagram_profile_url || pData.instagram || prev.instagram,
+              googleMapsUrl: pData.google_maps_link || pData.googleMapsUrl || prev.googleMapsUrl,
+              whatsappChannelUrl: pData.whatsapp_channel_link || pData.whatsappChannelUrl || prev.whatsappChannelUrl
+            }));
+            if (pData.about_text || pData.about_highlight) {
+              setContent(prev => ({
+                ...prev,
+                aboutText: pData.about_text || prev.aboutText,
+                aboutHighlight: pData.about_highlight || prev.aboutHighlight
+              }));
+            }
+          }
         }
         if (hoursRes.status === 'fulfilled' && hoursRes.value.exists()) {
           const rawHours = hoursRes.value.data();

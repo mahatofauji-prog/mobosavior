@@ -80,7 +80,7 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
         }}
       >
         <span className="text-yellow-500 animate-pulse text-[8px] sm:text-xs">★</span>
-        <span className="text-yellow-400 font-extrabold">PURULIA KA TRUSTED MOBILE REPAIRING SHOP</span>
+        <span className="text-yellow-400 font-extrabold">{branding.tagline || 'PURULIA KA TRUSTED MOBILE REPAIRING SHOP'}</span>
         <span className="text-yellow-500 animate-pulse text-[8px] sm:text-xs">★</span>
       </div>
 
@@ -95,7 +95,7 @@ export default function Navbar({ currentRoute, onNavigate, branding, contact }: 
       <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-1 xs:gap-2">
         {/* Brand Logo */}
         <button onClick={() => handleLinkClick('home')} className="focus:outline-none flex-shrink max-w-[50%] xs:max-w-[55%] min-w-0">
-          <Logo logoUrl={branding.logoUrl} brandName={branding.brandName} />
+          <Logo logoUrl={branding.logoUrl} brandName={branding.brandName} tagline={branding.tagline} />
         </button>
 
         {/* Desktop Nav Links */}

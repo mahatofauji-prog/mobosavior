@@ -2,6 +2,8 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 import { createServer as createViteServer } from 'vite';
 import { 
   getSavedGA4Config, 
@@ -14,25 +16,141 @@ import {
 const app = express();
 const PORT = 3000;
 
+// Initialize Supabase Client for Backend Admin Operations
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://cynrkcrjcxpyiuagyvxj.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_63nVtmzyXYHGi1lLJWxwxw_6rY8XeKh';
+const supabaseBackend = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Salted PBKDF2 Password Hashing Utility
+function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const genSalt = salt || crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, genSalt, 10000, 64, 'sha512').toString('hex');
+  return { hash, salt: genSalt };
+}
+
+function verifyPassword(password: string, storedHash: string, storedSalt: string): boolean {
+  try {
+    const { hash } = hashPassword(password, storedSalt);
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+async function getStoredAdminAuth() {
+  try {
+    const { data, error } = await supabaseBackend
+      .from('settings')
+      .select('*')
+      .eq('id', 'admin_auth')
+      .maybeSingle();
+
+    if (error || !data) return null;
+    const authData = data.data || data.value || data;
+    if (authData && authData.password_hash && authData.salt) {
+      return { hash: authData.password_hash, salt: authData.salt };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Middleware for parsing JSON and urlencoded
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Secure Backend Admin Login Endpoint
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
   try {
     const { password } = req.body;
-    // Backend securely validates the password.
-    // In production, this can be managed via process.env.ADMIN_PASSWORD
-    const backendAdminSecret = process.env.ADMIN_PASSWORD || 'Mobofounder@2026';
-    
-    if (password === backendAdminSecret) {
-      // Simulate issuing a secure session token
-      return res.json({ success: true, token: 'session_active' });
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Password is required.' });
+    }
+
+    const storedAuth = await getStoredAdminAuth();
+    if (storedAuth) {
+      const isValid = verifyPassword(password, storedAuth.hash, storedAuth.salt);
+      if (isValid) {
+        return res.json({ success: true, token: 'session_active' });
+      } else {
+        return res.status(401).json({ success: false, message: 'Invalid admin password.' });
+      }
     } else {
-      return res.status(401).json({ success: false, message: 'Invalid admin password.' });
+      const backendAdminSecret = process.env.ADMIN_PASSWORD || 'Mobofounder@2026';
+      if (password === backendAdminSecret) {
+        return res.json({ success: true, token: 'session_active' });
+      } else {
+        return res.status(401).json({ success: false, message: 'Invalid admin password.' });
+      }
     }
   } catch (error) {
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+});
+
+// Secure Change Admin Password Endpoint
+app.post('/api/admin/change-password', async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
+
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, message: 'Current password is required.' });
+    }
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 8 characters.' });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: 'New passwords do not match.' });
+    }
+
+    // Verify current password
+    const storedAuth = await getStoredAdminAuth();
+    let isCurrentValid = false;
+    if (storedAuth) {
+      isCurrentValid = verifyPassword(currentPassword, storedAuth.hash, storedAuth.salt);
+    } else {
+      const backendAdminSecret = process.env.ADMIN_PASSWORD || 'Mobofounder@2026';
+      isCurrentValid = (currentPassword === backendAdminSecret);
+    }
+
+    if (!isCurrentValid) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect.' });
+    }
+
+    // Hash new password using PBKDF2 + SHA512 + Random Salt
+    const { hash, salt } = hashPassword(newPassword);
+
+    const payload = {
+      id: 'admin_auth',
+      data: {
+        password_hash: hash,
+        salt: salt,
+        updated_at: new Date().toISOString()
+      },
+      value: {
+        password_hash: hash,
+        salt: salt,
+        updated_at: new Date().toISOString()
+      },
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: upsertErr } = await supabaseBackend
+      .from('settings')
+      .upsert(payload);
+
+    if (upsertErr) {
+      console.error('[Change Password Supabase Error]:', upsertErr);
+      return res.status(500).json({ success: false, message: 'Failed to update password in database.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Password updated successfully. Please login again with your new password.'
+    });
+  } catch (error: any) {
+    console.error('[Change Password Exception]:', error);
     return res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 });

@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Calendar, Wrench, Image, Play, Star, HelpCircle, 
   FileText, ShieldAlert, Shield, LogOut, Plus, Edit, Trash2, Check, Search, Filter, 
   AlertCircle, Save, Loader2, Sparkles, SlidersHorizontal, Globe, CheckSquare, X, Eye, Phone, MessageSquare,
-  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink, Building2
+  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink, Building2, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getServiceImage } from '../utils/serviceImages';
@@ -32,6 +32,7 @@ import AdminBranches from '../components/admin/AdminBranches';
 import AdminSections from '../components/admin/AdminSections';
 import AdminAnalyticsDashboard from '../components/admin/AdminAnalyticsDashboard';
 import AdminBrandingBusinessProfile from '../components/admin/AdminBrandingBusinessProfile';
+import AdminChangePassword from '../components/admin/AdminChangePassword';
 import ImageUploader from '../components/admin/ImageUploader';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import { parseVideoUrl, getVideoPlatformLabel } from '../lib/videoUtils';
@@ -69,7 +70,7 @@ export default function AdminDashboard({
     | 'prices' | 'gallery' | 'videos' | 'reviews' | 'offers' | 'trust' | 'faq'
     | 'contact' | 'hours' | 'social' | 'maps' | 'content' | 'seo' | 'sections'
     | 'analytics' | 'slideshow' | 'media' | 'pages' | 'blog' | 'navigation' | 'media-library' | 'legal'
-    | 'branding-profile'
+    | 'branding-profile' | 'change-password'
   >('dashboard');
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1165,6 +1166,12 @@ export default function AdminDashboard({
         { id: 'legal' as const, label: 'Legal Pages', icon: ShieldAlert },
         { id: 'media-library' as const, label: 'Lab Media Library', icon: Database },
       ]
+    },
+    {
+      title: 'SECURITY & ACCOUNT',
+      items: [
+        { id: 'change-password' as const, label: 'Change Password', icon: ShieldCheck },
+      ]
     }
   ];
 
@@ -1357,6 +1364,13 @@ export default function AdminDashboard({
               <span>Explore All Modules</span>
             </button>
           </div>
+        )}
+
+        {activeTab === 'change-password' && (
+          <AdminChangePassword
+            onCancel={() => setActiveTab('dashboard')}
+            onSuccessLogout={handleLogout}
+          />
         )}
 
         {activeTab === 'sections' && (

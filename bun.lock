@@ -10,6 +10,7 @@
         "@supabase/supabase-js": "^2.116.0",
         "@tailwindcss/vite": "^4.1.14",
         "@vitejs/plugin-react": "^5.0.4",
+        "crypto-js": "^4.2.0",
         "dotenv": "^17.2.3",
         "express": "^4.21.2",
         "lucide-react": "^0.546.0",
@@ -22,6 +23,7 @@
         "vite": "^6.2.3",
       },
       "devDependencies": {
+        "@types/crypto-js": "^4.2.2",
         "@types/express": "^4.17.21",
         "@types/multer": "^2.2.0",
         "@types/node": "^22.14.0",
@@ -159,6 +161,8 @@
 
     "@types/connect": ["@types/connect@3.4.38", "", { "dependencies": { "@types/node": "*" } }, ""],
 
+    "@types/crypto-js": ["@types/crypto-js@4.2.2", "", {}, "sha512-sDOLlVbHhXpAUAL0YHDUUwDZf3iN4Bwi4W6a0W0b+QcAezUbRtH4FVb+9J4h+XFPW7l/gQ9F8qC7P+Ec4k8QVQ=="],
+
     "@types/debug": ["@types/debug@4.1.13", "", { "dependencies": { "@types/ms": "*" } }, ""],
 
     "@types/estree": ["@types/estree@1.0.9", "", {}, ""],
@@ -270,6 +274,8 @@
     "cookie": ["cookie@0.7.2", "", {}, ""],
 
     "cookie-signature": ["cookie-signature@1.0.7", "", {}, ""],
+
+    "crypto-js": ["crypto-js@4.2.0", "", {}, "sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q=="],
 
     "csstype": ["csstype@3.2.3", "", {}, ""],
 

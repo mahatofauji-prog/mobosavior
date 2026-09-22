@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sanitizePayload } from './dbSanitizer';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://cynrkcrjcxpyiuagyvxj.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_63nVtmzyXYHGi1lLJWxwxw_6rY8XeKh';
@@ -54,7 +55,8 @@ function buildSupabaseQuery(q: any) {
         if (c.op === '!=') sQuery = sQuery.neq(c.field, c.value);
         if (c.op === 'array-contains') sQuery = sQuery.contains(c.field, [c.value]);
       } else if (c.type === 'orderBy') {
-        sQuery = sQuery.order(c.field, { ascending: c.dir === 'asc' });
+        const snakeField = c.field.replace(/[A-Z]/g, (m: string) => `_${m.toLowerCase()}`);
+        sQuery = sQuery.order(snakeField, { ascending: c.dir === 'asc' });
       } else if (c.type === 'limit') {
         sQuery = sQuery.limit(c.n);
       }
@@ -69,52 +71,19 @@ export async function getDocs(q: any) {
     const { data, error } = await buildSupabaseQuery(q);
     if (!error && data) {
       list = data;
-    } else if (error) {
-      // If error occurred (e.g. schema cache column mismatch with camelCase vs snake_case),
-      // retry with plain select and sort in JavaScript memory
+    } else {
       const path = q.path;
       const { data: retryData, error: retryErr } = await supabase.from(path as any).select('*');
       if (!retryErr && retryData) {
         list = retryData;
-        if (q.constraints) {
-          const orderConstraint = q.constraints.find((c: any) => c.type === 'orderBy');
-          if (orderConstraint) {
-            const field = orderConstraint.field;
-            const snakeField = field.replace(/[A-Z]/g, (m: string) => `_${m.toLowerCase()}`);
-            const asc = orderConstraint.dir === 'asc';
-            list.sort((a: any, b: any) => {
-              const valA = a[field] ?? a[snakeField] ?? 0;
-              const valB = b[field] ?? b[snakeField] ?? 0;
-              return asc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
-            });
-          }
-        }
-      } else {
-        console.warn(`[getDocs] Query failed for collection ${path}:`, error.message);
+      } else if (error || retryErr) {
+        console.error(`[Supabase getDocs error]:`, error || retryErr);
       }
     }
   } catch (err) {
-    console.error(`[getDocs] Exception querying collection ${q?.path}:`, err);
+    console.error(`[Supabase getDocs exception]:`, err);
   }
 
-  // Merge with local offline cache for bookings if Supabase query failed or returned empty
-  try {
-    const col = q.path;
-    if (col === 'service_bookings' || col === 'service_bookings_public') {
-      const storageKey = `ms_backup_${col}`;
-      const cachedStr = localStorage.getItem(storageKey);
-      if (cachedStr) {
-        const cached = JSON.parse(cachedStr);
-        const existingIds = new Set(list.map((d: any) => d.id || d.service_id));
-        for (const item of cached) {
-          if (!existingIds.has(item.id) && !existingIds.has(item.service_id)) {
-            list.push(item);
-          }
-        }
-      }
-    }
-  } catch {}
-  
   return {
     empty: list.length === 0,
     size: list.length,
@@ -153,18 +122,6 @@ export async function getDoc(docRef: any) {
 
     const { data, error } = await (supabase.from(col as any)).select('*').eq('id', id).maybeSingle();
     if (error || !data) {
-      // If not found in Supabase (e.g. RLS blocked or offline), check localStorage
-      try {
-        const storageKey = `ms_backup_${col}`;
-        const cachedStr = localStorage.getItem(storageKey);
-        if (cachedStr) {
-          const cached = JSON.parse(cachedStr);
-          const match = cached.find((item: any) => item.id === id || item.service_id === id);
-          if (match) {
-            return { exists: () => true, data: () => match, id, ref: docRef };
-          }
-        }
-      } catch {}
       return { exists: () => false, data: () => undefined, id };
     }
     
@@ -194,61 +151,13 @@ export async function setDoc(docRef: any, data: any, options?: any) {
     return;
   }
 
-  let payload: any = { ...data };
-  if (id) payload.id = id;
+  let rawPayload: any = { ...data };
+  if (id) rawPayload.id = id;
 
-  // Cache to localStorage for offline persistence / immediate accessibility
-  try {
-    if (col === 'service_bookings' || col === 'service_bookings_public' || col === 'bookings') {
-      const storageKey = `ms_backup_${col}`;
-      const existingStr = localStorage.getItem(storageKey);
-      const items = existingStr ? JSON.parse(existingStr) : [];
-      const updated = [payload, ...items.filter((item: any) => item.id !== payload.id && item.service_id !== payload.service_id)];
-      localStorage.setItem(storageKey, JSON.stringify(updated.slice(0, 100)));
-    }
-  } catch {}
-
-  // Strict sanitization for branches table to prevent schema cache mismatch
-  if (col === 'branches') {
-    const metaObj = {
-      description: payload.description || '',
-      imageUrl: payload.imageUrl || '',
-      weeklyHoliday: payload.weeklyHoliday || '',
-      serviceIds: payload.serviceIds || [],
-      isMain: !!(payload.isMain || payload.isHeadquarters),
-      isFeatured: payload.isFeatured !== undefined ? payload.isFeatured : true,
-      isActive: payload.isActive !== undefined ? payload.isActive : true,
-      seoTitle: payload.seoTitle || '',
-      seoDescription: payload.seoDescription || ''
-    };
-    const bHours = typeof payload.businessHours === 'object' && payload.businessHours !== null ? payload.businessHours : {};
-    payload = {
-      id: payload.id,
-      name: payload.name || '',
-      slug: payload.slug || payload.id,
-      branchCode: payload.branchCode || payload.branch_code || '',
-      branch_code: payload.branchCode || payload.branch_code || '',
-      address: payload.address || '',
-      city: payload.city || 'Purulia',
-      state: payload.state || 'West Bengal',
-      pincode: payload.pincode || '723101',
-      googleMapsUrl: payload.googleMapsUrl || payload.google_maps_url || '',
-      google_maps_url: payload.googleMapsUrl || payload.google_maps_url || '',
-      latitude: payload.latitude !== undefined && payload.latitude !== '' && payload.latitude !== null ? parseFloat(payload.latitude) : null,
-      longitude: payload.longitude !== undefined && payload.longitude !== '' && payload.longitude !== null ? parseFloat(payload.longitude) : null,
-      phone: payload.phone || '',
-      whatsapp: payload.whatsapp || '',
-      email: payload.email || null,
-      businessHours: { ...bHours, _meta: metaObj },
-      business_hours: { ...bHours, _meta: metaObj },
-      isHeadquarters: !!(payload.isMain || payload.isHeadquarters),
-      is_headquarters: !!(payload.isMain || payload.isHeadquarters),
-      displayOrder: Number(payload.displayOrder || payload.display_order) || 1,
-      display_order: Number(payload.displayOrder || payload.display_order) || 1
-    };
-  }
+  // Sanitize payload to send strictly clean snake_case columns
+  const cleanPayload = sanitizePayload(col, rawPayload);
   
-  const { error } = await (supabase.from(col as any)).upsert(payload);
+  const { error } = await (supabase.from(col as any)).upsert(cleanPayload);
   if (error) {
     console.error(`[Supabase setDoc ${col} error]:`, error);
     throw error;
@@ -257,8 +166,12 @@ export async function setDoc(docRef: any, data: any, options?: any) {
 
 export async function addDoc(colRef: any, data: any) {
   const col = colRef.path;
-  const { data: result, error } = await supabase.from(col as any).insert(data).select().single();
-  if (error) throw error;
+  const cleanPayload = sanitizePayload(col, data);
+  const { data: result, error } = await supabase.from(col as any).insert(cleanPayload).select().single();
+  if (error) {
+    console.error(`[Supabase addDoc ${col} error]:`, error);
+    throw error;
+  }
   return { id: result.id, path: `${col}/${result.id}` };
 }
 
@@ -267,8 +180,12 @@ export async function updateDoc(docRef: any, data: any) {
   const col = parts[0];
   const id = parts[1];
   
-  const { error } = await supabase.from(col as any).update(data).eq('id', id);
-  if (error) throw error;
+  const cleanPayload = sanitizePayload(col, data);
+  const { error } = await supabase.from(col as any).update(cleanPayload).eq('id', id);
+  if (error) {
+    console.error(`[Supabase updateDoc ${col} error]:`, error);
+    throw error;
+  }
 }
 
 export async function deleteDoc(docRef: any) {
@@ -277,7 +194,10 @@ export async function deleteDoc(docRef: any) {
   const id = parts[1];
   
   const { error } = await supabase.from(col as any).delete().eq('id', id);
-  if (error) throw error;
+  if (error) {
+    console.error(`[Supabase deleteDoc ${col} error]:`, error);
+    throw error;
+  }
 }
 
 export function onSnapshot(target: any, callback: any, errorCallback?: any) {
@@ -323,11 +243,9 @@ export function writeBatch(db: any) {
     delete: (docRef: any) => ops.push({ type: 'delete', docRef }),
     commit: async () => {
       await Promise.all(ops.map(async op => {
-        try {
-          if (op.type === 'upsert') await setDoc(op.docRef, op.data);
-          if (op.type === 'update') await updateDoc(op.docRef, op.data);
-          if (op.type === 'delete') await deleteDoc(op.docRef);
-        } catch {}
+        if (op.type === 'upsert') await setDoc(op.docRef, op.data);
+        if (op.type === 'update') await updateDoc(op.docRef, op.data);
+        if (op.type === 'delete') await deleteDoc(op.docRef);
       }));
     }
   };
@@ -339,8 +257,6 @@ export function serverTimestamp() {
 
 export const auth = {
   currentUser: null,
-  signOut: async () => {
-    // local passcode signout
-  }
+  signOut: async () => {}
 };
 export async function signOut(auth?: any) {}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { uploadMediaFile, deleteMediaFile, compressThumbnailFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
@@ -346,36 +347,24 @@ export default function AdminGalleryManager() {
         title: title || (mediaType === 'video' ? 'Repair Video' : 'Repair Gallery Item'),
         description: description || '',
         category: finalCategoryId,
-        imageUrl: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
         image_url: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
-        videoUrl: finalVideoUrl || null,
         video_url: finalVideoUrl || null,
+        before_image_url: finalBeforeUrl || null,
+        after_image_url: finalAfterUrl || null,
+        thumbnail_url: officialThumbnailUrl || null,
+        service_slug: serviceSlug || null,
+        brand: brand || null,
+        model: model || null,
         featured: !!featured,
         active: active !== false,
         is_active: active !== false,
-        displayOrder: Number(displayOrder) || 1,
         display_order: Number(displayOrder) || 1,
-        createdAt: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString(),
         created_at: editingItem ? (editingItem.createdAt || new Date().toISOString()) : new Date().toISOString()
       };
 
-      // Save to localStorage backup first so it is instantly persisted even if Supabase network fails
-      try {
-        const localKey = 'ms_backup_gallery';
-        const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
-        const filtered = existing.filter((item: any) => item.id !== itemId);
-        filtered.push(galleryPayload);
-        localStorage.setItem(localKey, JSON.stringify(filtered));
-      } catch (e) {
-        console.warn('Local storage backup save warning:', e);
-      }
-
-      // Try Supabase upsert with fallback catch
-      try {
-        await supabase.from('gallery').upsert(galleryPayload);
-      } catch (netErr) {
-        console.warn('Supabase gallery upsert network exception (handled by local backup):', netErr);
-      }
+      const cleanGalleryPayload = sanitizePayload('gallery', galleryPayload);
+      const { error: galErr } = await supabase.from('gallery').upsert(cleanGalleryPayload);
+      if (galErr) throw galErr;
 
       // If it's a video, also sync to videos table
       if (mediaType === 'video' && finalVideoUrl) {
@@ -384,23 +373,17 @@ export default function AdminGalleryManager() {
           title: title || 'Repair Video',
           description: description || '',
           category: finalCategoryId,
-          videoUrl: finalVideoUrl,
           video_url: finalVideoUrl,
-          imageUrl: officialThumbnailUrl,
           image_url: officialThumbnailUrl,
+          thumbnail_url: officialThumbnailUrl,
           featured: !!featured,
-          active: active !== false,
           is_active: active !== false,
-          displayOrder: Number(displayOrder) || 1,
           display_order: Number(displayOrder) || 1,
-          createdAt: galleryPayload.createdAt,
           created_at: galleryPayload.created_at
         };
-        try {
-          await supabase.from('videos').upsert(videoPayload);
-        } catch (vNetErr) {
-          console.warn('Supabase video upsert network exception:', vNetErr);
-        }
+        const cleanVideoPayload = sanitizePayload('videos', videoPayload);
+        const { error: vidErr } = await supabase.from('videos').upsert(cleanVideoPayload);
+        if (vidErr) console.warn('Supabase video upsert warning:', vidErr);
       }
 
       setModalOpen(false);

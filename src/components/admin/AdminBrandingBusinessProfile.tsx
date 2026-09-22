@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { uploadMediaFile, validateImageFile } from '../../lib/storageUpload';
 import { BrandingSettings, ContactSettings, WebsiteContent, BusinessProfile } from '../../types';
 import { 
@@ -399,7 +400,8 @@ export default function AdminBrandingBusinessProfile({
           updated_at: nowIso
         };
 
-        const { error: bpError } = await supabase.from('business_profile').upsert(bpRow, { onConflict: 'id' });
+        const cleanBpRow = sanitizePayload('business_profile', bpRow);
+        const { error: bpError } = await supabase.from('business_profile').upsert(cleanBpRow, { onConflict: 'id' });
         if (bpError) {
           console.warn('business_profile table upsert note (non-critical):', bpError.message);
         }

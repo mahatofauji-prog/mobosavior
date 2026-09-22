@@ -2,63 +2,53 @@ import { Brand, PhoneModel, ServiceCategory } from '../types';
 
 export const DEFAULT_CATEGORIES: ServiceCategory[] = [
   {
-    id: 'cat-iphone',
-    name: 'iPhone Repair',
-    h1Name: 'iPhone Repair in Purulia',
-    seoTitle: 'iPhone Repair in Purulia | MOBO SAVIOR',
-    metaDescription: 'Professional iPhone repair shop in Purulia specializing in iPhone screen replacement, battery health, Face ID restoration, and iPhone motherboard repair.',
-    imageAltText: 'iPhone motherboard repair technician in Purulia',
-    slug: 'iphone-repair',
-    description: 'Expert diagnostics and precision hardware repairs for all Apple iPhone models from iPhone 11 to iPhone 16 Pro Max in Purulia.',
-    longDescription: 'Equipped with Apple-grade calibration tools, TrueTone EEPROM programmers, OEM display presses, and stereoscopic microscopes, MOBO SAVIOR handles everything from genuine display laminations and battery restorations to delicate FaceID flex trace and iPhone motherboard repair in Purulia.',
-    imageUrl: '/assets/images/service_iphone_repair_1788169632215.jpg',
-    icon: 'Smartphone',
-    badge: 'Apple Specialist',
+    id: 'cat-motherboard',
+    name: 'Motherboard & Chip-Level Repair',
+    h1Name: 'Mobile Motherboard Repair in Purulia',
+    seoTitle: 'Mobile Motherboard Repair in Purulia | MOBO SAVIOR',
+    metaDescription: 'Best mobile motherboard repair in Purulia. Specialized in iPhone motherboard repair, Android motherboard repair, CPU reballing, mobile IC repair, and short circuit repair.',
+    imageAltText: 'Mobile motherboard repair and microsoldering in Purulia',
+    slug: 'motherboard-repair',
+    description: 'Advanced motherboard diagnostics, micro-soldering, IC replacement, short-circuit repair and chip-level board restoration.',
+    longDescription: 'Purulia\'s advanced workstation equipped with a 7X-45X trinocular microscope, ShortCam II infrared thermal imaging, computerized BGA hot air rework station, and QianLi CNC stencils. We specialize in mobile motherboard repair, IC replacements, and reviving dead phones.',
+    imageUrl: '/assets/images/motherboard_repair_1790050660908.jpg',
+    icon: 'Cpu',
+    badge: 'Level 4 Micro-Soldering',
     displayOrder: 1,
     active: true,
     problemsCovered: [
-      'Cracked Front Screen & Retina OLED Lines',
-      'Degraded Battery Health & Rapid Battery Drain',
-      'FaceID Dot Projector Failure & Camera Black Screen',
-      'Broken Back Glass & Rear Housing Damage',
-      'No Charging / Port Moisture Detected Error',
-      'Stuck on Apple Logo Bootloop & Error 4013',
-      'Water Immersion Corrosion & Board Shorts'
+      'Micro-soldering & IC replacement',
+      'Short-circuit & dead board recovery',
+      'Trace jumpering & component restoration'
     ],
     serviceSlugs: [
-      'iphone-repair',
-      'oled-display',
-      'battery-replacement',
-      'charging-problem',
-      'camera-problem',
-      'water-damage-repair',
+      'motherboard-repair',
+      'cpu-reballing',
       'dead-no-power-repair',
-      'software-programming'
+      'emmc-ufs-programming',
+      'network-signal-repair',
+      'charging-problem'
     ]
   },
   {
     id: 'cat-android',
-    name: 'Android Repair',
+    name: 'Android Phone Repair',
     h1Name: 'Android Mobile Repair in Purulia',
     seoTitle: 'Android Mobile Repair in Purulia | MOBO SAVIOR',
     metaDescription: 'Expert Android mobile repair shop in Purulia for Samsung, OnePlus, Xiaomi, Vivo, Oppo, Realme, and Pixel. Screen, battery, and Android motherboard repair.',
     imageAltText: 'Android motherboard repair in Purulia',
     slug: 'android-repair',
-    description: 'Comprehensive hardware and Android motherboard repair solutions in Purulia for Samsung, OnePlus, Xiaomi, Vivo, Oppo, Realme, and Pixel.',
+    description: 'Professional Android smartphone hardware diagnostics, motherboard repair, display, charging and component-level solutions.',
     longDescription: 'Full-spectrum servicing for Android flagships and mid-range devices in Purulia. From high-refresh-rate curved AMOLED replacements and fast SuperVOOC/Warp charging port repairs to RF baseband IC soldering and Android motherboard repair.',
-    imageUrl: '/assets/images/slide_android_1788168049303.jpg',
+    imageUrl: '/assets/images/android_repair_1790050677195.jpg',
     icon: 'TabletSmartphone',
-    badge: 'Multi-Brand Flagships',
+    badge: 'Multi-Brand Android',
     displayOrder: 2,
     active: true,
     problemsCovered: [
-      'Curved AMOLED & 120Hz Fluid Display Fractures',
-      'Fast Charging Not Working / Sub-Board Damage',
-      '4G/5G Network No Service & Baseband Unknown',
-      'Overheating, Battery Swelling & Sudden Shutdowns',
-      'Distorted Loudspeaker, Earpiece & Mic Failure',
-      'Cracked Camera Glass & Autofocus Blur',
-      'Liquid Damage Ultrasonic Board Recovery'
+      'Samsung, OnePlus, Xiaomi & Vivo',
+      'AMOLED & charging sub-board fixes',
+      'Component-level hardware solutions'
     ],
     serviceSlugs: [
       'android-repair',
@@ -72,36 +62,112 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     ]
   },
   {
-    id: 'cat-motherboard',
-    name: 'Motherboard & Chip-Level Repair',
-    h1Name: 'Mobile Motherboard Repair in Purulia',
-    seoTitle: 'Mobile Motherboard Repair in Purulia | MOBO SAVIOR',
-    metaDescription: 'Best mobile motherboard repair in Purulia. Specialized in iPhone motherboard repair, Android motherboard repair, CPU reballing, mobile IC repair, and eMMC/UFS programming.',
-    imageAltText: 'Mobile motherboard repair and microsoldering in Purulia',
-    slug: 'motherboard-repair',
-    description: 'Advanced micro-soldering, CPU reballing in Purulia, eMMC/UFS memory programming, and dead phone recovery.',
-    longDescription: 'Purulia\'s advanced workstation equipped with a 7X-45X trinocular microscope, ShortCam II infrared thermal imaging, computerized BGA hot air rework station, and QianLi CNC stencils. We specialize in mobile motherboard repair, CPU reballing in Purulia, mobile IC repair, and reviving dead phones.',
-    imageUrl: '/assets/images/differ_micro_soldering_1788169185732.jpg',
-    icon: 'Cpu',
-    badge: 'Level 4 Micro-Soldering',
+    id: 'cat-flip-fold',
+    name: 'Samsung Flip & Fold Repair',
+    h1Name: 'Flip & Fold Mobile Repair in Purulia',
+    seoTitle: 'Flip & Fold Mobile Repair in Purulia | MOBO SAVIOR',
+    metaDescription: 'Specialist Flip and Fold mobile repair in Purulia for Samsung Galaxy Z Fold, Z Flip, Motorola Razr, and OnePlus. Hinge restoration and flexible display repair.',
+    imageAltText: 'Flip and Fold mobile repair in Purulia',
+    slug: 'flip-fold-repair',
+    description: 'Specialized repair solutions for Samsung Flip and Fold smartphones including display, hinge, flex, motherboard and hardware-related problems.',
+    longDescription: 'Folding devices require specialized mechanical and thermal procedures. We repair Samsung Galaxy Z Fold, Z Flip, Motorola Razr, and OnePlus Open in Purulia with millimeter-precision hinge dust clearance, UTG ultra-thin glass lamination, and folding flex ribbon restoration.',
+    imageUrl: '/assets/images/flip_fold_repair_1790050690123.jpg',
+    icon: 'Layers',
+    badge: 'Foldable Engineering',
     displayOrder: 3,
     active: true,
     problemsCovered: [
-      'Poco X3 / X3 Pro / Redmi Note CPU & RAM Reboot Loops',
-      'Completely Dead Phone / 0.00A Power Supply Draw',
-      'VCC Main & VDD Boost Short Circuits Traced with Thermal Cam',
-      'eMMC / UFS Storage 90% Consumed Health Recovery',
-      'Baseband Unknown / No IMEI / RF Transceiver IC Failure',
-      'Audio IC Loop / No Mic & Sound During Calls',
-      'Charging IC / PMIC Power Management Replacement'
+      'Flexible display & UTG lamination',
+      'Hinge dust clearance & realignment',
+      'Flex ribbon & motherboard repairs'
     ],
     serviceSlugs: [
-      'motherboard-repair',
-      'cpu-reballing',
-      'dead-no-power-repair',
-      'emmc-ufs-programming',
-      'network-signal-repair',
+      'flip-fold-repair',
+      'samsung-fold-repair',
+      'samsung-flip-repair',
+      'foldable-display-repair',
+      'hinge-repair',
+      'inner-display-repair',
+      'outer-display-repair'
+    ]
+  },
+  {
+    id: 'cat-display',
+    name: 'Display & Touch Replacement',
+    h1Name: 'Mobile Display Repair in Purulia',
+    seoTitle: 'iPhone & Mobile Display Repair in Purulia | MOBO SAVIOR',
+    metaDescription: 'iPhone display repair and mobile screen replacement in Purulia. Premium OLED, AMOLED, and original display repairs with TrueTone support.',
+    imageAltText: 'iPhone display repair service in Purulia',
+    slug: 'display-replacement',
+    description: 'Professional display, AMOLED/OLED, touch and screen replacement for iPhone and Android smartphones.',
+    longDescription: 'Choose from multiple verified screen tiers tailored to your budget and performance needs. Every display repair in Purulia includes precision dust seal framing, TrueTone transfer where supported, touch responsiveness validation, and warranty protection.',
+    imageUrl: '/assets/images/display_replacement_1790050710979.jpg',
+    icon: 'ShieldCheck',
+    badge: 'Display Center',
+    displayOrder: 4,
+    active: true,
+    problemsCovered: [
+      '100% Genuine OEM & OLED panels',
+      'Touch digitizer & ghost touch fix',
+      'Precision frame alignment'
+    ],
+    serviceSlugs: [
+      'display-replacement',
+      'original-display',
+      'oled-display',
+      'curved-display',
+      'green-line-white-display'
+    ]
+  },
+  {
+    id: 'cat-battery-charging',
+    name: 'Battery & Charging Port Solutions',
+    h1Name: 'Battery & Charging Port Solutions in Purulia',
+    seoTitle: 'Battery & Charging Port Solutions in Purulia | MOBO SAVIOR',
+    metaDescription: 'Battery replacement, charging port repair, and charging IC diagnostics in Purulia.',
+    imageAltText: 'Battery and charging port repair in Purulia',
+    slug: 'battery-charging-solutions',
+    description: 'Battery replacement, charging port repair, charging IC diagnostics and charging-related hardware solutions.',
+    longDescription: 'Expert battery diagnostics and OEM replacement batteries for all flagship and mid-range devices, paired with precision Type-C/Lightning charging port solder repairs and charging PMIC troubleshooting.',
+    imageUrl: '/assets/images/battery_charging_1790050730031.jpg',
+    icon: 'ShieldCheck',
+    badge: 'Power & Port Hub',
+    displayOrder: 5,
+    active: true,
+    problemsCovered: [
+      'High-capacity battery swap',
+      'Type-C & sub-board port repair',
+      'Charging IC & OVP diagnostics'
+    ],
+    serviceSlugs: [
+      'battery-replacement',
       'charging-problem'
+    ]
+  },
+  {
+    id: 'cat-software',
+    name: 'Software & Programming',
+    h1Name: 'Software & Programming in Purulia',
+    seoTitle: 'Software & Programming in Purulia | MOBO SAVIOR',
+    metaDescription: 'Software troubleshooting, flashing, programming, firmware-related solutions and supported unlocking services in Purulia.',
+    imageAltText: 'Mobile software and programming station in Purulia',
+    slug: 'software-programming',
+    description: 'Software troubleshooting, flashing, programming, firmware-related solutions and supported unlocking services.',
+    longDescription: 'Authorized software recovery using EDL test points, official server authorization boxes, and fastboot protocols in Purulia. We safely resolve bricked handsets, system bootloops after botched updates, eMMC/UFS memory partition errors, and security lock assistance.',
+    imageUrl: '/assets/images/software_programming_1790050745198.jpg',
+    icon: 'Terminal',
+    badge: 'EDL & Firmware Lab',
+    displayOrder: 6,
+    active: true,
+    problemsCovered: [
+      'System crash & bootloop unbrick',
+      'Authorized firmware flashing',
+      'Diagnostic firmware & programming'
+    ],
+    serviceSlugs: [
+      'software-programming',
+      'emmc-ufs-programming',
+      'dead-no-power-repair'
     ]
   },
   {
@@ -112,19 +178,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Specialized CPU reballing, double-decker RAM sandwich reballing, and automatic restart loop fix for Poco, Redmi, Samsung, and OnePlus in Purulia.',
     imageAltText: 'CPU Reballing and micro soldering workstation in Purulia',
     slug: 'cpu-reballing',
-    description: 'Specialized CPU reballing, double-decker RAM repair, restart/boot loop recovery, and processor-level motherboard repair.',
+    description: 'CPU Reballing • Restart/Boot Loop Problem • CPU-related Motherboard Repair',
     longDescription: 'Precision double-decker CPU & RAM desoldering using CNC laser stencils, low-temperature SAC305 alloy paste, and stereoscopic microscope alignment. Solves Poco X3/X3 Pro, Redmi Note series, OnePlus 9/10/11 series reboot issues, camera dead, and audio dead symptoms permanently.',
-    imageUrl: '/assets/images/service_cpu_soldering_1788169676958.jpg',
+    imageUrl: '/assets/images/cpu_reballing_1790050758447.jpg',
     icon: 'Cpu',
     badge: 'CPU & APU Specialist',
-    displayOrder: 4,
+    displayOrder: 7,
     active: true,
     problemsCovered: [
-      'CPU Reballing & Double-Decker RAM Separation',
-      'Restart & Auto Boot Loop Problem',
-      'CPU-related Motherboard Power Circuit Repair',
-      'Sudden System Freezing & Blank Display on Logo',
-      'Front/Back Camera Stopped Working After Update'
+      'Poco, Redmi & OnePlus CPU reballing',
+      'Double-decker RAM sandwich repair',
+      'Auto restart & boot loop fix'
     ],
     serviceSlugs: [
       'cpu-reballing',
@@ -140,19 +204,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Storage IC reballing, eMMC and UFS memory chip replacement, health 90% consumed repair, and RPMB provisioning in Purulia.',
     imageAltText: 'eMMC and UFS memory chip replacement in Purulia',
     slug: 'emmc-ufs-reballing',
-    description: 'Expert eMMC/UFS memory chip reballing, storage IC replacement, partition health repair, and storage-related troubleshooting.',
+    description: 'eMMC Reballing • UFS Reballing • eMMC/UFS Replacement • Storage-related Problems',
     longDescription: 'Equipped with EasyJTAG Plus, UFI Box, and MiPI Tester for read/write partition repair, eMMC health 90% exhausted revival, UFS 2.1 / 3.1 / 4.0 IC reballing, and clean hardware storage swap with RPMB data preservation.',
-    imageUrl: '/assets/images/slide_cpuic_1788168157704.jpg',
+    imageUrl: '/assets/images/emmc_ufs_reballing_1790050773698.jpg',
     icon: 'HardDrive',
     badge: 'Storage & Memory Hub',
-    displayOrder: 5,
+    displayOrder: 8,
     active: true,
     problemsCovered: [
-      'eMMC Reballing & Solder Joint Refresh',
-      'UFS 2.2 / 3.1 / 4.0 Chip Reballing',
-      'eMMC / UFS Storage Replacement & Upgrade',
-      'Storage Partition Health 90% Exhausted Warning',
-      'Device Only Detected as Qualcomm 9008 / MTK Port'
+      'eMMC & UFS 2.1/3.1 reballing',
+      '90% consumed storage health fix',
+      'Memory IC hardware swap & ISP'
     ],
     serviceSlugs: [
       'emmc-ufs-programming',
@@ -168,19 +230,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Fastboot unbricking, EDL flashing, system bootloop repairs, official firmware flashing, and forgotten lock assistance in Purulia.',
     imageAltText: 'Software flashing and EDL recovery bench in Purulia',
     slug: 'software-unlocking',
-    description: 'Complete software repairs, authorized firmware flashing, EDL recovery, bootloader unbricking, and unlocking solutions.',
+    description: 'Software Issues • Flashing • Programming • Unlocking • Software-related Problems',
     longDescription: 'Official server authorization tools and deep-flash protocols to revive hard-bricked devices, recover corrupted OS partitions, solve fastboot loop errors, and provide legitimate screen lock/FRP recovery assistance with verification.',
-    imageUrl: '/assets/images/differ_diagnostic_bench_1788169232321.jpg',
+    imageUrl: '/assets/images/software_unlocking_1790050786705.jpg',
     icon: 'Terminal',
-    badge: 'EDL & Firmware Lab',
-    displayOrder: 6,
+    badge: 'Unlocking & Firmware',
+    displayOrder: 9,
     active: true,
     problemsCovered: [
-      'Software Hang & System Crash Loops',
-      'Authorized Factory Firmware Flashing',
-      'Qualcomm EDL 9008 & MTK Preloader Unbrick',
-      'Pattern / PIN / FRP Forgotten Passcode Support',
-      'OTA Update Failed & Red DM-Verity Error'
+      'System flashing & ROM recovery',
+      'EDL mode & preloader unbricking',
+      'Legitimate security unlock support'
     ],
     serviceSlugs: [
       'software-programming',
@@ -195,19 +255,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Complete logic board swapping, iPhone serialized component pairing, FaceID transfer, and motherboard replacement in Purulia.',
     imageAltText: 'Motherboard swapping and component pairing in Purulia',
     slug: 'motherboard-swapping',
-    description: 'Motherboard replacement/swapping, IC data transfer, device pairing, and serialized component synchronization.',
+    description: 'Motherboard Replacement/Swapping • Board Pairing • Device Pairing-related Solutions',
     longDescription: 'When logic boards suffer catastrophic PCB layer fractures or heavy acid immersion, we perform board-to-board transplant, EEPROM security chip transfer, CPU+NAND+Baseband pairing, and full board replacement with genuine diagnostics.',
-    imageUrl: '/assets/images/slide_deadphone_1788168106265.jpg',
+    imageUrl: '/assets/images/board_swapping_1790050811341.jpg',
     icon: 'Cpu',
     badge: 'Board Swap & Pairing',
-    displayOrder: 7,
+    displayOrder: 10,
     active: true,
     problemsCovered: [
-      'Motherboard Replacement & Clean Board Swapping',
-      'CPU + NAND + Baseband Trio Transfer',
-      'Serialized Part Pairing & Calibration Solutions',
-      'Face ID & TrueTone Serialized Transfer',
-      'Severe PCB Crack & Unrepairable Board Recovery'
+      'Clean board swap & transplant',
+      'CPU+NAND+Baseband trio pairing',
+      'Serialized component calibration'
     ],
     serviceSlugs: [
       'motherboard-repair',
@@ -223,19 +281,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'RF transceiver IC repair, Baseband unknown fix, No SIM / No Service / Weak signal repair for 4G and 5G smartphones in Purulia.',
     imageAltText: 'Mobile network IC repair and RF testing in Purulia',
     slug: 'network-solutions',
-    description: 'Precision diagnostics for No Network, No Service, Weak Signal, Baseband Unknown, and RF power amplifier IC repairs.',
+    description: 'No Network • No Service • Weak Signal • Network IC/Hardware-related Problems',
     longDescription: 'Comprehensive RF circuit probing with spectrum analyzer and digital multimeter. We repair Baseband PMIC, SDR/WTR transceiver ICs, antenna switch modules, and 5G RF front-end filters to restore full voice and data connectivity.',
-    imageUrl: '/assets/images/slide_network_1788168142613.jpg',
+    imageUrl: '/assets/images/network_solutions_1790050826784.jpg',
     icon: 'Radio',
     badge: 'RF & Baseband Lab',
-    displayOrder: 8,
+    displayOrder: 11,
     active: true,
     problemsCovered: [
-      'No Network / No Service / Emergency Calls Only',
-      'Weak Signal & Frequent Call Dropping',
-      'Baseband Version Unknown & Null IMEI',
-      'WTR / SDR Transceiver & RF IC Replacement',
-      'WiFi / Bluetooth Greyed Out or Not Turning On'
+      'WTR & SDR transceiver IC replacement',
+      'Baseband Unknown & Null IMEI fix',
+      '5G / 4G RF power amplifier repair'
     ],
     serviceSlugs: [
       'network-signal-repair',
@@ -250,19 +306,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Curved OLED and AMOLED screen replacement, green line / white screen repair, and edge touch digitizer restoration in Purulia.',
     imageAltText: 'Curved AMOLED screen repair in Purulia',
     slug: 'curved-display-repair',
-    description: 'Curved AMOLED/OLED display lining repair, original display replacement, touch digitizer solutions, and high refresh-rate calibration.',
+    description: 'Curved AMOLED/OLED Display Repair • Display Replacement • Touch/Display Problems',
     longDescription: 'Specialized in Samsung Edge/Ultra, OnePlus Curved, Motorola Edge, and Vivo X-Series displays. We provide original curved AMOLED panels with 120Hz LTPO smoothness, in-display optical/ultrasonic fingerprint support, and flex bonding repair.',
-    imageUrl: '/assets/images/slide_flip_1788168172190.jpg',
+    imageUrl: '/assets/images/curved_display_repair_1790050840795.jpg',
     icon: 'Smartphone',
     badge: 'Curved AMOLED Hub',
-    displayOrder: 9,
+    displayOrder: 12,
     active: true,
     problemsCovered: [
-      'Curved AMOLED / OLED Display Lining Repair',
-      'Green Line / Pink Line / White Screen Issue',
-      'Curved Screen Glass Breakage with Touch Working',
-      'Edge Ghost Touch & Responsive Calibration',
-      'Complete Blackout with Vibration Indicator'
+      'Edge-to-edge curved AMOLED screens',
+      'Green line & pink line OLED fix',
+      'Edge ghost touch calibration'
     ],
     serviceSlugs: [
       'curved-display',
@@ -278,19 +332,17 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Diamond molybdenum wire curved glass cutting, OCA vacuum lamination, and original display glass restoration in Purulia.',
     imageAltText: 'Curved glass cutting and OCA lamination machine in Purulia',
     slug: 'curved-glass-cutting',
-    description: 'Precision curved glass separation using diamond alloy wire, OCA bubble-free lamination, and glass-only refurbishment.',
+    description: 'Curved Glass Cutting • Glass Replacement • OCA/Lamination Work',
     longDescription: 'Keep your 100% original factory display intact while saving up to 70% of replacement cost. We safely cut fractured outer curved glass on a heating vacuum separator and laminate OEM grade scratch-resistant glass with high-pressure autoclave chambers.',
-    imageUrl: '/assets/images/slide_display_1788168074454.jpg',
+    imageUrl: '/assets/images/curved_glass_cutting_1790050858654.jpg',
     icon: 'Layers',
     badge: 'OCA Vacuum Lamination',
-    displayOrder: 10,
+    displayOrder: 13,
     active: true,
     problemsCovered: [
-      'Curved Glass Separation by Molybdenum Wire',
-      'Original Display Glass Only Replacement',
-      'OCA Film Bubble-Free Vacuum Lamination',
-      'Retain 100% Original Colors & In-Display Fingerprint',
-      'Cost-Effective Alternative to Full Screen Replacement'
+      'Molybdenum wire curved glass separation',
+      'Retain 100% original AMOLED panel',
+      'OCA bubble-free vacuum lamination'
     ],
     serviceSlugs: [
       'curved-display',
@@ -305,116 +357,21 @@ export const DEFAULT_CATEGORIES: ServiceCategory[] = [
     metaDescription: 'Laser machine iPhone back glass removal, seamless back panel replacement, and middle frame housing restoration in Purulia.',
     imageAltText: 'Laser back glass removal machine in Purulia',
     slug: 'iphone-back-glass',
-    description: 'Laser-guided iPhone back glass replacement, wireless charging coil protection, back panel and full housing restoration.',
+    description: 'iPhone Back Glass Replacement • Back Panel Replacement • Housing-related Work',
     longDescription: 'Using computerized optical laser machines to vaporize rear adhesive without dismantling internal motherboard or battery. Restores shattered iPhone 11 to iPhone 16 Pro Max back glass to original factory finish with MagSafe alignment and water-resistant perimeter bonding.',
-    imageUrl: '/assets/images/slide_iphone_1788168033319.jpg',
+    imageUrl: '/assets/images/back_glass_repair_1790050876115.jpg',
     icon: 'Smartphone',
     badge: 'Laser Rear Glass Lab',
-    displayOrder: 11,
+    displayOrder: 14,
     active: true,
     problemsCovered: [
-      'iPhone Back Glass Laser Separation & Replacement',
-      'Back Panel & Metal Chassis Housing Renewal',
-      'MagSafe / Wireless Charging Coil Preservation',
-      'Camera Bezel & Rear Lens Glass Replacement',
-      'Bent Frame Straightening & Corner Ding Repair'
+      'Laser machine adhesive vaporizing',
+      'MagSafe & wireless charging protection',
+      'Full rear chassis housing renewal'
     ],
     serviceSlugs: [
       'iphone-repair',
       'battery-replacement'
-    ]
-  },
-  {
-    id: 'cat-flip-fold',
-    name: 'Flip & Fold Repair',
-    h1Name: 'Flip & Fold Mobile Repair in Purulia',
-    seoTitle: 'Flip & Fold Mobile Repair in Purulia | MOBO SAVIOR',
-    metaDescription: 'Specialist Flip and Fold mobile repair in Purulia for Samsung Galaxy Z Fold, Z Flip, Motorola Razr, and OnePlus. Hinge restoration and flexible display repair.',
-    imageAltText: 'Flip and Fold mobile repair in Purulia',
-    slug: 'flip-fold-repair',
-    description: 'Specialist flexible OLED replacement, precision hinge alignment, and Flip and Fold mobile repair in Purulia.',
-    longDescription: 'Folding devices require specialized mechanical and thermal procedures. We repair Samsung Galaxy Z Fold, Z Flip, Motorola Razr, and OnePlus Open in Purulia with millimeter-precision hinge dust clearance, UTG ultra-thin glass lamination, and folding flex ribbon restoration.',
-    imageUrl: '/assets/images/service_foldable_repair_1788169709156.jpg',
-    icon: 'Layers',
-    badge: 'Foldable Engineering',
-    displayOrder: 12,
-    active: true,
-    problemsCovered: [
-      'Galaxy Z Fold Inner Flexible Screen Blackout or Crease Tear',
-      'Z Flip Hinge Won\'t Open Fully 180° / Stuck Gear Mechanism',
-      'Loss of Audio / WiFi / Bluetooth When Folding Device',
-      'Outer Cover AMOLED Display Glass Fracture',
-      'Dual Battery Out-of-Sync Drainage',
-      'Ultra-Thin Glass (UTG) Delamination & Crease Bubbles'
-    ],
-    serviceSlugs: [
-      'flip-fold-repair',
-      'samsung-fold-repair',
-      'samsung-flip-repair',
-      'foldable-display-repair',
-      'hinge-repair',
-      'inner-display-repair',
-      'outer-display-repair'
-    ]
-  },
-  {
-    id: 'cat-display',
-    name: 'Display Replacement',
-    h1Name: 'Mobile Display Repair in Purulia',
-    seoTitle: 'iPhone & Mobile Display Repair in Purulia | MOBO SAVIOR',
-    metaDescription: 'iPhone display repair and mobile screen replacement in Purulia. Premium OLED, AMOLED, and original display repairs with TrueTone support.',
-    imageAltText: 'iPhone display repair service in Purulia',
-    slug: 'display-replacement',
-    description: 'Quality-certified iPhone display repair and mobile screen replacements in Purulia: TFT, Premium OLED, 100% Original OEM, and Curved AMOLED.',
-    longDescription: 'Choose from multiple verified screen tiers tailored to your budget and performance needs. Every display repair in Purulia includes precision dust seal framing, TrueTone transfer where supported, touch responsiveness validation, and warranty protection.',
-    imageUrl: '/assets/images/service_display_replace_1788169648346.jpg',
-    icon: 'ShieldCheck',
-    badge: 'Multi-Grade Certified',
-    displayOrder: 13,
-    active: true,
-    problemsCovered: [
-      'Cracked Outer Glass with Working Touch & Display',
-      'Green Line / Pink Line / White Screen After Software Updates',
-      'Complete Black Screen / Bleeding Ink Blotches',
-      'Ghost Touch / Unresponsive Touch Digitizer',
-      'Flickering Display & Backlight Failure',
-      'Color Inversion / Low Brightness Issues'
-    ],
-    serviceSlugs: [
-      'display-replacement',
-      'original-display',
-      'oled-display',
-      'curved-display',
-      'green-line-white-display'
-    ]
-  },
-  {
-    id: 'cat-software',
-    name: 'Software & Programming',
-    h1Name: 'eMMC & UFS Programming in Purulia',
-    seoTitle: 'eMMC & UFS Programming in Purulia | MOBO SAVIOR',
-    metaDescription: 'eMMC/UFS memory programming, fastboot bootloop unbricking, and official firmware flashing for mobile phones in Purulia.',
-    imageAltText: 'Mobile eMMC and UFS programming station at MOBO SAVIOR Purulia',
-    slug: 'software-programming',
-    description: 'Dead boot unbricking, fastboot loops, eMMC/UFS programming in Purulia, and official firmware flashing.',
-    longDescription: 'Authorized software recovery using EDL test points, official server authorization boxes, and fastboot protocols in Purulia. We safely resolve bricked handsets, system bootloops after botched updates, eMMC/UFS memory partition errors, and security lock assistance.',
-    imageUrl: '/assets/images/service_software_edl_1788169726207.jpg',
-    icon: 'Terminal',
-    badge: 'Firmware & EDL',
-    displayOrder: 14,
-    active: true,
-    problemsCovered: [
-      'Device Stuck on Manufacturer Logo (Bootloop)',
-      'Qualcomm EDL 9008 Mode / MTK Preloader Port Brick',
-      'Corrupted Recovery / Fastboot Loop After Update',
-      'eMMC / UFS Firmware Re-flashing & Partition Recovery',
-      'System UI Has Stopped / Application Crash Loops',
-      'Device Locked / Forgotten Screen Passcode Assistance'
-    ],
-    serviceSlugs: [
-      'software-programming',
-      'emmc-ufs-programming',
-      'dead-no-power-repair'
     ]
   }
 ];

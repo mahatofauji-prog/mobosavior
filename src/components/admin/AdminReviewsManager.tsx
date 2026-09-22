@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { uploadMediaFile, compressImageToDataUrl, validateImageFile } from '../../lib/storageUpload';
 import { Review, GoogleReviewsSettings } from '../../types';
 import { 
@@ -326,14 +327,10 @@ export default function AdminReviewsManager() {
       const payload = {
         id: revId,
         customer_name: cleanName,
-        customerName: cleanName,
         reviewer_name: cleanName,
-        reviewerName: cleanName,
         rating: Number(rating) || 5,
         review_text: cleanReview,
-        reviewText: cleanReview,
         customer_photo_url: photoPreview || customerPhotoUrl || null,
-        customerPhotoUrl: photoPreview || customerPhotoUrl || null,
         source: source,
         active: isActive,
         is_active: isActive,
@@ -343,13 +340,12 @@ export default function AdminReviewsManager() {
         device_model: cleanPhone || null,
         featured: true,
         display_order: 0,
-        displayOrder: 0,
         created_at: timestamp,
-        createdAt: timestamp,
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase.from('reviews').upsert(payload);
+      const cleanPayload = sanitizePayload('reviews', payload);
+      const { error } = await supabase.from('reviews').upsert(cleanPayload);
       if (error) throw error;
 
       await fetchData();

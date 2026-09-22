@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { Offer, OfferCategory, OfferCTAType } from '../../types';
 import { getOfferStatus } from '../../utils/offerHelpers';
 import { DEFAULT_OFFERS, DEFAULT_OFFER_CATEGORIES } from '../../lib/seed';
@@ -148,30 +149,25 @@ export default function AdminOffers() {
         id,
         title: offerForm.title.trim() || 'Special Offer',
         description: offerForm.description.trim(),
-        categoryId: offerForm.categoryId || (selectedCat ? selectedCat.id : 'cat-discount'),
         category_id: offerForm.categoryId || (selectedCat ? selectedCat.id : 'cat-discount'),
         category: categoryName,
         discount: offerForm.discount.trim(),
-        discount_amount: offerForm.discount.trim(),
-        imageUrl: offerForm.imageUrl.trim(),
         image_url: offerForm.imageUrl.trim(),
-        destinationUrl: destUrl,
         destination_url: destUrl,
-        startDate: offerForm.startDate || null,
-        endDate: offerForm.endDate || null,
+        start_date: offerForm.startDate || null,
+        end_date: offerForm.endDate || null,
         valid_until: offerForm.endDate || null,
         terms: offerForm.terms.trim() || null,
-        ctaText: offerForm.ctaText.trim() || 'Claim Offer',
-        ctaType: offerForm.ctaType || (destUrl ? 'url' : 'whatsapp'),
-        ctaValue: destUrl || offerForm.ctaValue.trim() || null,
-        isFeatured: !!offerForm.isFeatured,
-        isActive: offerForm.isActive !== false,
+        cta_text: offerForm.ctaText.trim() || 'Claim Offer',
+        cta_type: offerForm.ctaType || (destUrl ? 'url' : 'whatsapp'),
+        cta_value: destUrl || offerForm.ctaValue.trim() || null,
+        is_featured: !!offerForm.isFeatured,
         is_active: offerForm.isActive !== false,
-        displayOrder: Number(offerForm.displayOrder) || 1,
         display_order: Number(offerForm.displayOrder) || 1
       };
 
-      const { error } = await supabase.from('offers').upsert(payload);
+      const cleanPayload = sanitizePayload('offers', payload);
+      const { error } = await supabase.from('offers').upsert(cleanPayload);
       if (error) {
         console.error('[Supabase Offer Save Error]:', error);
         throw error;

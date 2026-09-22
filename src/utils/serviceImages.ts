@@ -18,100 +18,74 @@ export function normalizeImageUrl(url?: string | null): string {
 }
 
 export const DEFAULT_SERVICE_IMAGES: Record<string, string> = {
-  // Category Slugs & IDs
+  // 1. Motherboard & Chip-Level Repair
+  'cat-motherboard': '/assets/images/motherboard_repair_1790050660908.jpg',
+  'motherboard-repair': '/assets/images/motherboard_repair_1790050660908.jpg',
+  'advanced-chip-level-repair': '/assets/images/motherboard_repair_1790050660908.jpg',
+
+  // 2. Android Phone Repair
+  'cat-android': '/assets/images/android_repair_1790050677195.jpg',
+  'android-repair': '/assets/images/android_repair_1790050677195.jpg',
+
+  // 3. Samsung Flip & Fold Repair
+  'cat-flip-fold': '/assets/images/flip_fold_repair_1790050690123.jpg',
+  'flip-fold-repair': '/assets/images/flip_fold_repair_1790050690123.jpg',
+  'samsung-fold-repair': '/assets/images/flip_fold_repair_1790050690123.jpg',
+  'samsung-flip-repair': '/assets/images/flip_fold_repair_1790050690123.jpg',
+
+  // 4. Display & Touch Replacement
+  'cat-display': '/assets/images/display_replacement_1790050710979.jpg',
+  'display-replacement': '/assets/images/display_replacement_1790050710979.jpg',
+  'original-display': '/assets/images/display_replacement_1790050710979.jpg',
+
+  // 5. Battery & Charging Port Solutions
+  'cat-battery-charging': '/assets/images/battery_charging_1790050730031.jpg',
+  'battery-charging-solutions': '/assets/images/battery_charging_1790050730031.jpg',
+  'battery-replacement': '/assets/images/battery_charging_1790050730031.jpg',
+  'charging-problem': '/assets/images/battery_charging_1790050730031.jpg',
+
+  // 6. Software & Programming
+  'cat-software': '/assets/images/software_programming_1790050745198.jpg',
+  'software-programming': '/assets/images/software_programming_1790050745198.jpg',
+
+  // 7. CPU Reballing & Restart Solution
+  'cat-cpu-reballing': '/assets/images/cpu_reballing_1790050758447.jpg',
+  'cpu-reballing': '/assets/images/cpu_reballing_1790050758447.jpg',
+
+  // 8. eMMC/UFS Reballing & Replacement
+  'cat-emmc-ufs': '/assets/images/emmc_ufs_reballing_1790050773698.jpg',
+  'emmc-ufs-reballing': '/assets/images/emmc_ufs_reballing_1790050773698.jpg',
+  'emmc-ufs-programming': '/assets/images/emmc_ufs_reballing_1790050773698.jpg',
+
+  // 9. Software & Unlocking Solutions
+  'cat-software-unlocking': '/assets/images/software_unlocking_1790050786705.jpg',
+  'software-unlocking': '/assets/images/software_unlocking_1790050786705.jpg',
+
+  // 10. Motherboard Swapping & Pairing Solutions
+  'cat-motherboard-swapping': '/assets/images/board_swapping_1790050811341.jpg',
+  'motherboard-swapping': '/assets/images/board_swapping_1790050811341.jpg',
+
+  // 11. Network & No Service Solutions
+  'cat-network-solutions': '/assets/images/network_solutions_1790050826784.jpg',
+  'network-solutions': '/assets/images/network_solutions_1790050826784.jpg',
+  'network-signal-repair': '/assets/images/network_solutions_1790050826784.jpg',
+
+  // 12. Curved Display Repair & Replacement
+  'cat-curved-display': '/assets/images/curved_display_repair_1790050840795.jpg',
+  'curved-display-repair': '/assets/images/curved_display_repair_1790050840795.jpg',
+  'curved-display': '/assets/images/curved_display_repair_1790050840795.jpg',
+
+  // 13. Curved Display Glass Cutting & Replacement
+  'cat-curved-glass-cutting': '/assets/images/curved_glass_cutting_1790050858654.jpg',
+  'curved-glass-cutting': '/assets/images/curved_glass_cutting_1790050858654.jpg',
+
+  // 14. iPhone Back Glass / Back Panel Replacement
+  'cat-iphone-back-glass': '/assets/images/back_glass_repair_1790050876115.jpg',
+  'iphone-back-glass': '/assets/images/back_glass_repair_1790050876115.jpg',
+
+  // Legacy mappings for backward compatibility
   'cat-iphone': '/assets/images/service_iphone_repair_1788169632215.jpg',
-  'iphone-repair': '/assets/images/service_iphone_repair_1788169632215.jpg',
-  
-  'cat-android': '/assets/images/slide_android_1788168049303.jpg',
-  'android-repair': '/assets/images/slide_android_1788168049303.jpg',
-  
-  'cat-motherboard': '/assets/images/differ_micro_soldering_1788169185732.jpg',
-  'motherboard-repair': '/assets/images/differ_micro_soldering_1788169185732.jpg',
-  
-  'cat-cpu-reballing': '/assets/images/service_cpu_soldering_1788169676958.jpg',
-  'cpu-reballing': '/assets/images/service_cpu_soldering_1788169676958.jpg',
-  
-  'cat-emmc-ufs': '/assets/images/slide_cpuic_1788168157704.jpg',
-  'emmc-ufs-reballing': '/assets/images/slide_cpuic_1788168157704.jpg',
-  'emmc-ufs-programming': '/assets/images/slide_cpuic_1788168157704.jpg',
-  
-  'cat-software-unlocking': '/assets/images/differ_diagnostic_bench_1788169232321.jpg',
-  'software-unlocking': '/assets/images/differ_diagnostic_bench_1788169232321.jpg',
-  'software-programming': '/assets/images/service_software_edl_1788169726207.jpg',
-  'cat-software': '/assets/images/service_software_edl_1788169726207.jpg',
-  
-  'cat-motherboard-swapping': '/assets/images/slide_deadphone_1788168106265.jpg',
-  'motherboard-swapping': '/assets/images/slide_deadphone_1788168106265.jpg',
-  
-  'cat-network-solutions': '/assets/images/slide_network_1788168142613.jpg',
-  'network-solutions': '/assets/images/slide_network_1788168142613.jpg',
-  'network-signal-repair': '/assets/images/slide_network_1788168142613.jpg',
-  
-  'cat-curved-display': '/assets/images/slide_flip_1788168172190.jpg',
-  'curved-display-repair': '/assets/images/slide_flip_1788168172190.jpg',
-  'curved-display': '/assets/images/slide_flip_1788168172190.jpg',
-  
-  'cat-curved-glass-cutting': '/assets/images/slide_display_1788168074454.jpg',
-  'curved-glass-cutting': '/assets/images/slide_display_1788168074454.jpg',
-  
-  'cat-iphone-back-glass': '/assets/images/slide_iphone_1788168033319.jpg',
-  'iphone-back-glass': '/assets/images/slide_iphone_1788168033319.jpg',
-  
-  'cat-flip-fold': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'flip-fold-repair': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'flip-fold-mobile-repair': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'samsung-fold-repair': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'samsung-flip-repair': '/assets/images/slide_foldable_1788168190438.jpg',
-  'foldable-display-repair': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'hinge-repair': '/assets/images/slide_foldable_1788168190438.jpg',
-  'inner-display-repair': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'outer-display-repair': '/assets/images/slide_display_1788168074454.jpg',
-  
-  // Display Specialty
-  'cat-display': '/assets/images/service_display_replace_1788169648346.jpg',
-  'display-replacement': '/assets/images/service_display_replace_1788169648346.jpg',
-  'tft-display': '/assets/images/service_display_replace_1788169648346.jpg',
-  'oled-display': '/assets/images/slide_display_1788168074454.jpg',
-  'premium-display': '/assets/images/slide_display_1788168074454.jpg',
-  'original-display': '/assets/images/service_display_replace_1788169648346.jpg',
-  'green-line-fix': '/assets/images/service_display_replace_1788169648346.jpg',
-  'green-line-white-display': '/assets/images/service_display_replace_1788169648346.jpg',
-  'touch-problem': '/assets/images/service_display_replace_1788169648346.jpg',
-  
-  // Hardware & Logic Board
-  'ic-replacement': '/assets/images/slide_cpuic_1788168157704.jpg',
-  'dead-no-power-repair': '/assets/images/service_dead_phone_1788169662887.jpg',
-  'advanced-chip-level-repair': '/assets/images/differ_micro_soldering_1788169185732.jpg',
-  'battery-replacement': '/assets/images/service_battery_replace_1788169692807.jpg',
-  'water-damage': '/assets/images/service_dead_phone_1788169662887.jpg',
-  'water-damage-repair': '/assets/images/service_dead_phone_1788169662887.jpg',
-  'charging-problem': '/assets/images/slide_chargeport_1788168121909.jpg',
-  'charging-repair': '/assets/images/slide_chargeport_1788168121909.jpg',
-  'network-problem': '/assets/images/slide_network_1788168142613.jpg',
-  'network-repair': '/assets/images/slide_network_1788168142613.jpg',
-  'camera-problem': '/assets/images/differ_thermal_inspection_1788169210295.jpg',
-  'dead-phone-repair': '/assets/images/service_dead_phone_1788169662887.jpg',
-  'cpu-ic-level-repair': '/assets/images/service_cpu_soldering_1788169676958.jpg',
-  
-  // ID Mappings
-  'srv-1': '/assets/images/service_iphone_repair_1788169632215.jpg',
-  'srv-2': '/assets/images/slide_android_1788168049303.jpg',
-  'srv-3': '/assets/images/differ_micro_soldering_1788169185732.jpg',
-  'srv-4': '/assets/images/service_cpu_soldering_1788169676958.jpg',
-  'srv-5': '/assets/images/differ_diagnostic_bench_1788169232321.jpg',
-  'srv-6': '/assets/images/slide_cpuic_1788168157704.jpg',
-  'srv-7': '/assets/images/service_display_replace_1788169648346.jpg',
-  'srv-8': '/assets/images/slide_display_1788168074454.jpg',
-  'srv-9': '/assets/images/slide_display_1788168074454.jpg',
-  'srv-10': '/assets/images/service_display_replace_1788169648346.jpg',
-  'srv-11': '/assets/images/service_display_replace_1788169648346.jpg',
-  'srv-12': '/assets/images/service_foldable_repair_1788169709156.jpg',
-  'srv-13': '/assets/images/service_battery_replace_1788169692807.jpg',
-  'srv-14': '/assets/images/differ_diagnostic_bench_1788169232321.jpg',
-  'srv-15': '/assets/images/service_dead_phone_1788169662887.jpg',
-  'srv-16': '/assets/images/slide_chargeport_1788168121909.jpg',
-  'srv-17': '/assets/images/slide_network_1788168142613.jpg',
-  'srv-18': '/assets/images/differ_thermal_inspection_1788169210295.jpg'
+  'iphone-repair': '/assets/images/service_iphone_repair_1788169632215.jpg'
 };
 
 /**

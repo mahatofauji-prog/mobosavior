@@ -1,5 +1,6 @@
 import React, { useState, useEffect, FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { Branch, Service, WeeklyBusinessHours, DayBusinessHours } from '../../types';
 import { DEFAULT_BRANCHES } from '../../lib/seed';
 import { isOpenNow } from '../../utils/branchHelpers';
@@ -296,66 +297,33 @@ export default function AdminBranches({ onRefreshData }: AdminBranchesProps) {
       id: branchId,
       name: formState.name.trim(),
       slug: finalSlug,
-      branchCode: uniqueBranchCode,
       branch_code: uniqueBranchCode,
       address: formState.address.trim(),
-      city: formState.city.trim() || 'Ranchi',
-      state: formState.state.trim() || 'Jharkhand',
+      city: formState.city.trim() || 'Purulia',
+      state: formState.state.trim() || 'West Bengal',
       pincode: formState.pincode.trim() || '723101',
-      googleMapsUrl: formState.googleMapsUrl.trim(),
       google_maps_url: formState.googleMapsUrl.trim(),
       latitude: formState.latitude !== '' ? parseFloat(formState.latitude) : null,
       longitude: formState.longitude !== '' ? parseFloat(formState.longitude) : null,
       phone: formState.phone.trim(),
       whatsapp: formState.whatsapp.trim(),
       email: formState.email.trim() || null,
-      businessHours: businessHoursWithMeta,
       business_hours: businessHoursWithMeta,
-      isHeadquarters: !!formState.isMain,
       is_headquarters: !!formState.isMain,
-      displayOrder: Number(formState.displayOrder) || 1,
       display_order: Number(formState.displayOrder) || 1
     };
 
+    const cleanPayload = sanitizePayload('branches', branchPayload);
+
     try {
-      let saveError = null;
       if (isNew) {
         // STRICT INSERT FOR NEW BRANCH - NEVER OVERWRITE EXISTING
-        const { error } = await supabase.from('branches').insert([branchPayload]);
-        saveError = error;
+        const { error } = await supabase.from('branches').insert([cleanPayload]);
+        if (error) throw error;
       } else {
         // STRICT UPDATE ONLY TARGET BRANCH
-        const { error } = await supabase.from('branches').update(branchPayload).eq('id', editingBranch.id);
-        saveError = error;
-      }
-
-      if (saveError) {
-        // Retry with pure snake_case payload in case camelCase columns caused schema cache error
-        const cleanSnakePayload: any = {
-          id: branchId,
-          name: formState.name.trim(),
-          slug: finalSlug,
-          branch_code: uniqueBranchCode,
-          address: formState.address.trim(),
-          city: formState.city.trim() || 'Purulia',
-          state: formState.state.trim() || 'West Bengal',
-          pincode: formState.pincode.trim() || '723101',
-          google_maps_url: formState.googleMapsUrl.trim(),
-          latitude: formState.latitude !== '' ? parseFloat(formState.latitude) : null,
-          longitude: formState.longitude !== '' ? parseFloat(formState.longitude) : null,
-          phone: formState.phone.trim(),
-          whatsapp: formState.whatsapp.trim(),
-          email: formState.email.trim() || null,
-          business_hours: businessHoursWithMeta,
-          is_headquarters: !!formState.isMain,
-          display_order: Number(formState.displayOrder) || 1
-        };
-
-        const retryRes = isNew
-          ? await supabase.from('branches').insert([cleanSnakePayload])
-          : await supabase.from('branches').update(cleanSnakePayload).eq('id', editingBranch.id);
-
-        if (retryRes.error) throw retryRes.error;
+        const { error } = await supabase.from('branches').update(cleanPayload).eq('id', editingBranch.id);
+        if (error) throw error;
       }
 
       setIsModalOpen(false);

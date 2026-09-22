@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { Brand, PhoneModel, ServiceCategory, Service } from '../../types';
 import { DEFAULT_BRANDS, DEFAULT_MODELS, DEFAULT_CATEGORIES } from '../../data/modelsData';
 import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';
@@ -150,20 +151,18 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
       const payload: any = {
         name: rawName,
         slug: rawName.toLowerCase().replace(/\s+/g, '-'),
-        logoUrl: logo,
         logo_url: logo,
-        displayOrder: order,
         display_order: order,
-        active: activeVal,
         is_active: activeVal
       };
 
+      const cleanPayload = sanitizePayload('brands', payload);
       let savedRecord: any = null;
 
       if (isEdit) {
         const { data: updateRes, error } = await supabase
           .from('brands')
-          .update(payload)
+          .update(cleanPayload)
           .eq('id', id)
           .select()
           .single();
@@ -174,10 +173,10 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
         }
         savedRecord = updateRes;
       } else {
-        payload.id = id;
+        cleanPayload.id = id;
         const { data: insertRes, error } = await supabase
           .from('brands')
-          .insert(payload)
+          .insert(cleanPayload)
           .select()
           .single();
 
@@ -257,21 +256,19 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
         name: modelName,
         slug: modelName.toLowerCase().replace(/\s+/g, '-'),
         brand: brand,
-        releaseYear: releaseYr,
-        imageUrl: img,
+        release_year: releaseYr,
         image_url: img,
-        displayOrder: order,
         display_order: order,
-        active: activeVal,
         is_active: activeVal
       };
 
+      const cleanPayload = sanitizePayload('models', payload);
       let savedRecord: any = null;
 
       if (isEdit) {
         const { data: updateRes, error } = await supabase
           .from('models')
-          .update(payload)
+          .update(cleanPayload)
           .eq('id', id)
           .select()
           .single();
@@ -282,12 +279,12 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
         }
         savedRecord = updateRes;
       } else {
-        payload.id = id;
-        payload.servicePrices = {};
-        payload.availableServices = [];
+        cleanPayload.id = id;
+        cleanPayload.service_prices = {};
+        cleanPayload.available_services = [];
         const { data: insertRes, error } = await supabase
           .from('models')
-          .insert(payload)
+          .insert(cleanPayload)
           .select()
           .single();
 

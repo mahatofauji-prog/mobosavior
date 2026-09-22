@@ -1,5 +1,6 @@
 import React, { useState, useEffect, FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { PriceItem, PriceType, Service, Brand, PhoneModel } from '../../types';
 import { getFormattedPriceString, formatAmount } from '../../utils/priceHelpers';
 import { ALL_COMPREHENSIVE_SERVICES } from '../../data/servicesData';
@@ -239,33 +240,27 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
 
       const payload: any = {
         service_slug: formState.serviceSlug,
-        serviceSlug: formState.serviceSlug,
         service_name: serviceName,
-        serviceName: serviceName,
         category: category,
         brand: formState.brand.trim() || null,
         model: formState.model.trim() || null,
         display_variant: formState.displayVariant.trim() || null,
-        displayVariant: formState.displayVariant.trim() || null,
         price_type: formState.priceType,
-        priceType: formState.priceType,
         amount: amountVal,
         currency: formState.currency || '₹',
         notes: formState.notes.trim() || null,
         is_active: formState.isActive,
-        isActive: formState.isActive,
         display_order: orderVal,
-        displayOrder: orderVal,
-        updated_at: now,
-        updatedAt: now
+        updated_at: now
       };
 
+      const cleanPayload = sanitizePayload('prices', payload);
       let savedRecord: any = null;
 
       if (isEdit) {
         const { data: updateRes, error: updateErr } = await supabase
           .from('prices')
-          .update(payload)
+          .update(cleanPayload)
           .eq('id', id)
           .select()
           .single();
@@ -276,12 +271,11 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
         }
         savedRecord = updateRes;
       } else {
-        payload.id = id;
-        payload.created_at = now;
-        payload.createdAt = now;
+        cleanPayload.id = id;
+        cleanPayload.created_at = now;
         const { data: insertRes, error: insertErr } = await supabase
           .from('prices')
-          .insert(payload)
+          .insert(cleanPayload)
           .select()
           .single();
 

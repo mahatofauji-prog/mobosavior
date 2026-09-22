@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sanitizePayload } from '../../lib/dbSanitizer';
 import { ServiceCategory, Service } from '../../types';
 import { DEFAULT_CATEGORIES } from '../../data/modelsData';
 import ImageUploader from './ImageUploader';
@@ -188,26 +189,22 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
         name: formName.trim(),
         slug: cleanSlug,
         description: formDescription.trim(),
-        longDescription: formLongDescription.trim() || formDescription.trim(),
         long_description: formLongDescription.trim() || formDescription.trim(),
-        imageUrl: cleanImageUrl,
         image_url: cleanImageUrl,
         badge: formBadge.trim() || 'Specialized Hub',
-        displayOrder: displayOrderNum,
         display_order: displayOrderNum,
-        problemsCovered: formProblems,
         problems_covered: formProblems,
-        serviceSlugs: formServiceSlugs,
         service_slugs: formServiceSlugs
       };
 
+      const cleanPayload = sanitizePayload('categories', payload);
       let savedRecord: any = null;
 
       if (categoryModal.category) {
         // Real Supabase UPDATE
         const { data: updateRes, error: updateErr } = await supabase
           .from('categories')
-          .update(payload)
+          .update(cleanPayload)
           .eq('id', id)
           .select()
           .single();
@@ -223,10 +220,10 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
         savedRecord = updateRes;
       } else {
         // Real Supabase INSERT
-        payload.id = id;
+        cleanPayload.id = id;
         const { data: insertRes, error: insertErr } = await supabase
           .from('categories')
-          .insert(payload)
+          .insert(cleanPayload)
           .select()
           .single();
 

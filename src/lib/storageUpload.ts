@@ -311,63 +311,40 @@ export async function uploadMediaFile(
   const isImage = processedFile.type.startsWith('image/') || 
     ['.jpg', '.jpeg', '.png', '.webp', '.gif'].some(ext => processedFile.name.toLowerCase().endsWith(ext));
 
-  // Helper for instant, high-efficiency data URL fallback
-  const getFallbackResult = async (): Promise<UploadResult> => {
-    if (isImage) {
-      onProgress?.(50);
-      const { dataUrl, size } = await compressImageToDataUrl(processedFile, 1200, 0.8);
-      onProgress?.(100);
-      if (dataUrl) {
-        return {
-          success: true,
-          url: dataUrl,
-          filename: processedFile.name,
-          size,
-          mimeType: 'image/webp'
-        };
-      }
-    }
-    return {
-      success: false,
-      url: '',
-      filename: file.name,
-      size: file.size,
-      mimeType: file.type,
-      error: 'Upload endpoint unavailable. Please try again.'
-    };
-  };
+  // Determine appropriate Supabase Storage bucket
+  const primaryBucket = (folder === 'offers' || folder === 'promotional-offers') ? 'promotional-offers' : 'mobosavior-media';
+  const bucketsToTry = [primaryBucket, 'mobosavior-media', 'media'];
 
-  // Try Supabase Storage first if bucket is available (with 5-second timeout)
-  try {
-    const sPath = generateStoragePath(processedFile, folder);
-    const storagePromise = supabase.storage
-      .from('mobosavior-media')
-      .upload(sPath, processedFile, {
-        cacheControl: '3600',
-        upsert: true
-      })
-      .catch((err) => ({ data: null, error: err }));
-    const timeoutPromise = new Promise<{ data: null; error: any }>((resolve) =>
-      setTimeout(() => resolve({ data: null, error: new Error('Supabase storage timeout') }), 5000)
-    );
-    const res: any = await Promise.race([storagePromise, timeoutPromise]);
-    if (res && !res.error && res.data) {
-      const { data: urlData } = supabase.storage
-        .from('mobosavior-media')
-        .getPublicUrl(sPath);
-      if (urlData?.publicUrl) {
-        onProgress?.(100);
-        return {
-          success: true,
-          url: urlData.publicUrl,
-          filename: processedFile.name,
-          size: processedFile.size,
-          mimeType: processedFile.type
-        };
+  // Try Supabase Storage buckets first
+  for (const bucket of bucketsToTry) {
+    try {
+      const sPath = generateStoragePath(processedFile, folder);
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from(bucket)
+        .upload(sPath, processedFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (!uploadErr && uploadData) {
+        const { data: urlData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(sPath);
+
+        if (urlData?.publicUrl) {
+          onProgress?.(100);
+          return {
+            success: true,
+            url: urlData.publicUrl,
+            filename: processedFile.name,
+            size: processedFile.size,
+            mimeType: processedFile.type
+          };
+        }
       }
+    } catch {
+      // Continue trying next bucket or server endpoint
     }
-  } catch {
-    // Continue to server or data URL fallback
   }
 
   const uniquePath = generateStoragePath(processedFile, folder);
@@ -388,41 +365,37 @@ export async function uploadMediaFile(
       }
     };
 
-    xhr.ontimeout = async () => {
-      if (isImage) {
-        const fallback = await getFallbackResult();
-        if (fallback.success) {
-          resolve(fallback);
-          return;
-        }
-      }
+    xhr.ontimeout = () => {
       resolve({
         success: false,
         url: '',
         filename: file.name,
         size: file.size,
         mimeType: file.type,
-        error: 'Upload timed out. Falling back to local data.'
+        error: 'Upload timed out. Please check your internet connection and try again.'
       });
     };
 
-    xhr.onload = async () => {
+    xhr.onerror = () => {
+      resolve({
+        success: false,
+        url: '',
+        filename: file.name,
+        size: file.size,
+        mimeType: file.type,
+        error: 'Network error occurred during file upload. Please check your connection.'
+      });
+    };
+
+    xhr.onload = () => {
       const rawText = (xhr.responseText || '').trim();
       const status = xhr.status;
 
-      // 1. Handle HTTP error status codes (e.g. 400, 401, 403, 404, 405, 413, 500)
+      // 1. Handle HTTP error status codes
       if (status < 200 || status >= 300) {
-        if (isImage) {
-          const fallback = await getFallbackResult();
-          if (fallback.success) {
-            resolve(fallback);
-            return;
-          }
-        }
-
         let errorMessage = `Upload failed with status ${status}.`;
         if (status === 401 || status === 403) {
-          errorMessage = 'Authentication failed. Please ensure you are logged in as an administrator.';
+          errorMessage = 'Authentication failed. Please ensure you are logged in as administrator.';
         } else if (status === 413) {
           errorMessage = 'Image size must be 15 MB or less.';
         } else if (status === 404) {
@@ -469,13 +442,6 @@ export async function uploadMediaFile(
 
       // 3. Handle unexpected HTML responses (e.g. login redirect, proxy error)
       if (rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html') || rawText.startsWith('<head')) {
-        if (isImage) {
-          const fallback = await getFallbackResult();
-          if (fallback.success) {
-            resolve(fallback);
-            return;
-          }
-        }
         resolve({
           success: false,
           url: '',
@@ -568,44 +534,6 @@ export async function uploadMediaFile(
       });
     };
 
-    xhr.onerror = async () => {
-      if (isImage) {
-        const fallback = await getFallbackResult();
-        if (fallback.success) {
-          resolve(fallback);
-          return;
-        }
-      }
-      resolve({
-        success: false,
-        url: '',
-        filename: file.name,
-        size: file.size,
-        mimeType: file.type,
-        error: 'Network error occurred during file upload. Please check your connection.'
-      });
-    };
-
-    xhr.ontimeout = async () => {
-      if (isImage) {
-        const fallback = await getFallbackResult();
-        if (fallback.success) {
-          resolve(fallback);
-          return;
-        }
-      }
-      resolve({
-        success: false,
-        url: '',
-        filename: file.name,
-        size: file.size,
-        mimeType: file.type,
-        error: 'Device photo upload is taking too long. Please check your connection and try again.'
-      });
-    };
-
-    // 45 seconds timeout for uploads
-    xhr.timeout = 45000;
     xhr.open('POST', `/api/upload?folder=${encodeURIComponent(folder)}`, true);
     xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
     xhr.send(formData);

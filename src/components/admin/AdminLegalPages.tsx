@@ -128,8 +128,8 @@ export default function AdminLegalPages() {
       const { data: secRows } = await supabase
         .from('legal_sections')
         .select('*')
-        .eq('pageId', pageData.id)
-        .order('displayOrder', { ascending: true });
+        .eq('page_id', pageData.id)
+        .order('display_order', { ascending: true });
 
       const fetchedSections: LegalSection[] = (secRows as LegalSection[]) || [];
 

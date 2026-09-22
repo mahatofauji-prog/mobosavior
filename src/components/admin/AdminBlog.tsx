@@ -56,7 +56,7 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
       const { data: postsData, error: postsErr } = await supabase
         .from('blog_posts')
         .select('*')
-        .order('publishDate', { ascending: false });
+        .order('publish_date', { ascending: false });
 
       if (postsErr) {
         console.error('[Supabase Blog Posts fetch error]:', postsErr);
@@ -68,7 +68,7 @@ export default function AdminBlog({ onRefreshData }: AdminBlogProps) {
       const { data: catsData, error: catsErr } = await supabase
         .from('blog_categories')
         .select('*')
-        .order('displayOrder', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (catsErr) {
         console.error('[Supabase Blog Cats fetch error]:', catsErr);

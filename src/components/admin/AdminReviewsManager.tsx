@@ -64,7 +64,7 @@ export default function AdminReviewsManager() {
       const { data: revData, error: revErr } = await supabase
         .from('reviews')
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (revErr) {
         console.error('[Supabase Reviews fetch error]:', revErr);

@@ -102,7 +102,7 @@ export default function AdminTrustSection() {
       const { data: fetchedRows, error } = await supabase
         .from('trust_points')
         .select('*')
-        .order('displayOrder', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (error) {
         console.error('[Supabase Trust Points Fetch Error]:', error);

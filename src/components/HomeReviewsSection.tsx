@@ -26,7 +26,7 @@ export default function HomeReviewsSection({ onNavigate }: HomeReviewsSectionPro
       const { data, error } = await supabase
         .from('reviews')
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Supabase reviews query error:', error);

@@ -36,7 +36,7 @@ export default function HomeOffersSection({ onNavigate, contact, offers: propOff
         const { data, error } = await supabase
           .from('offers')
           .select('*')
-          .order('displayOrder', { ascending: true });
+          .order('display_order', { ascending: true });
 
         if (error) {
           console.warn('[Supabase Offers fetch error]:', error);

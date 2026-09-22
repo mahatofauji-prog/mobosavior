@@ -149,7 +149,7 @@ export default function AdminGalleryManager() {
         const { data: gData, error: gErr } = await supabase
           .from('gallery')
           .select('*')
-          .order('displayOrder', { ascending: true });
+          .order('display_order', { ascending: true });
 
         if (!gErr && gData) {
           list = gData as GalleryItem[];
@@ -179,7 +179,7 @@ export default function AdminGalleryManager() {
         const { data: sData, error: sErr } = await supabase
           .from('services')
           .select('*')
-          .order('displayOrder', { ascending: true });
+          .order('display_order', { ascending: true });
 
         if (!sErr && sData) {
           setServices(sData as Service[]);

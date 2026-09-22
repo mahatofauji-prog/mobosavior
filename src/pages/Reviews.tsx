@@ -36,7 +36,7 @@ export default function Reviews() {
       const { data, error } = await supabase
         .from('reviews')
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('[Supabase Reviews fetch error]:', error);

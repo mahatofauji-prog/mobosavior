@@ -56,7 +56,7 @@ export default function AdminPages({ onRefreshData }: AdminPagesProps) {
       const { data, error: fetchErr } = await supabase
         .from('pages')
         .select('*')
-        .order('displayOrder', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (fetchErr) {
         console.error('Error loading pages:', fetchErr);

@@ -331,13 +331,13 @@ export default function AdminDashboard({
       const { data: gData } = await supabase
         .from('gallery')
         .select('*')
-        .order('displayOrder', { ascending: true });
+        .order('display_order', { ascending: true });
       if (gData) setGallery(gData as GalleryItem[]);
 
       const { data: vData } = await supabase
         .from('videos')
         .select('*')
-        .order('displayOrder', { ascending: true });
+        .order('display_order', { ascending: true });
       if (vData) setVideos(vData as VideoItem[]);
     } catch (err) {
       console.error('Error fetching media:', err);

@@ -64,8 +64,8 @@ export default function AdminOffers() {
     setLoading(true);
     try {
       const [offersRes, categoriesRes] = await Promise.all([
-        supabase.from('offers').select('*').order('displayOrder', { ascending: true }),
-        supabase.from('offer_categories').select('*').order('displayOrder', { ascending: true })
+        supabase.from('offers').select('*').order('display_order', { ascending: true }),
+        supabase.from('offer_categories').select('*').order('display_order', { ascending: true })
       ]);
 
       if (offersRes.error) {

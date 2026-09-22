@@ -25,7 +25,7 @@ export default function AdminNavigation() {
       const { data, error: fetchErr } = await supabase
         .from('navigation_items')
         .select('*')
-        .order('displayOrder', { ascending: true });
+        .order('display_order', { ascending: true });
 
       if (fetchErr) {
         console.error('Error fetching navigation items:', fetchErr);

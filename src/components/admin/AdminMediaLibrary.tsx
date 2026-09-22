@@ -22,7 +22,7 @@ export default function AdminMediaLibrary() {
       const { data, error: fetchErr } = await supabase
         .from('media_library')
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (fetchErr) {
         console.error('Error fetching media_library:', fetchErr);

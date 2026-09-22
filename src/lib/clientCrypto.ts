@@ -28,11 +28,6 @@ export async function clientHashPassword(password: string, saltHex?: string): Pr
 // Secure Client-Side Auth Fallback
 export async function fallbackVerifyAdminPassword(password: string): Promise<boolean> {
   try {
-    // Fail-safe: Always allow default master password to prevent lockouts
-    if (password === 'Mobofounder@2026') {
-      return true;
-    }
-
     const { data, error } = await supabase
       .from('settings')
       .select('*')
@@ -40,7 +35,8 @@ export async function fallbackVerifyAdminPassword(password: string): Promise<boo
       .maybeSingle();
 
     if (error || !data) {
-      return false;
+      // No custom password in database yet, allow default master password
+      return password === 'Mobofounder@2026';
     }
 
     const authData = data.data || data.value || data;
@@ -85,12 +81,16 @@ export async function fallbackVerifyAdminPassword(password: string): Promise<boo
         }
         return true;
       }
+
+      // If a custom password hash is present but didn't match, block the default password
+      return false;
     }
 
-    return false;
+    // No custom password hash in database settings, allow default master password
+    return password === 'Mobofounder@2026';
   } catch (err) {
     console.error('[fallbackVerifyAdminPassword error]:', err);
-    // Secure fail-safe backup fallback if database is offline or query fails
+    // If database or query fails, allow default master password to prevent lockouts
     return password === 'Mobofounder@2026';
   }
 }

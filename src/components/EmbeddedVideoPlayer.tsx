@@ -1,0 +1,192 @@
+import React, { useState } from 'react';
+import { parseVideoUrl } from '../lib/videoUtils';
+import { AlertCircle, ExternalLink, Play } from 'lucide-react';
+
+interface EmbeddedVideoPlayerProps {
+  videoUrl?: string | null;
+  title?: string;
+  thumbnailUrl?: string | null;
+  className?: string;
+  autoPlay?: boolean;
+}
+
+export default function EmbeddedVideoPlayer({
+  videoUrl,
+  title = 'Repair Video',
+  thumbnailUrl,
+  className = 'w-full h-full',
+  autoPlay = false
+}: EmbeddedVideoPlayerProps) {
+  const [embedError, setEmbedError] = useState(false);
+  const safeVideoUrl = typeof videoUrl === 'string' ? videoUrl.trim() : '';
+  const parsed = parseVideoUrl(safeVideoUrl);
+
+  if (!safeVideoUrl || !parsed || !parsed.isValid || embedError) {
+    return (
+      <div className={`flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300 rounded-2xl ${className}`}>
+        <AlertCircle className="w-10 h-10 text-amber-400 mb-2.5" />
+        <p className="text-sm font-bold text-white mb-1">
+          This video cannot be played here because embedding is not available for this post.
+        </p>
+        <p className="text-xs text-slate-400 max-w-sm mb-4">
+          The creator or social platform may have set privacy, age, or embed restrictions on this media item.
+        </p>
+        {safeVideoUrl ? (
+          <a
+            href={safeVideoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold rounded-xl border border-slate-700 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open Link in New Tab</span>
+          </a>
+        ) : null}
+      </div>
+    );
+  }
+
+  // 1. Direct HTML5 Video Player
+  const isDirectVideo =
+    parsed.platform === 'direct' ||
+    Boolean(
+      safeVideoUrl.match(/\.(mp4|webm|mov|m4v)(\?.*)?$/i) ||
+      safeVideoUrl.startsWith('blob:') ||
+      safeVideoUrl.includes('/storage/')
+    );
+
+  if (isDirectVideo) {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+        <video
+          src={safeVideoUrl}
+          controls
+          autoPlay={autoPlay}
+          poster={thumbnailUrl || undefined}
+          playsInline
+          className="w-full h-full object-contain max-h-[80vh]"
+          onError={() => setEmbedError(true)}
+        >
+          Your browser does not support HTML5 video playback.
+        </video>
+      </div>
+    );
+  }
+
+  // If embedError occurs or for social links where user wants custom poster/thumbnail fallback view initially
+  if (embedError) {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
+        {thumbnailUrl && (
+          <div className="absolute inset-0">
+            <img src={thumbnailUrl} alt={title} className="w-full h-full object-cover opacity-50 blur-sm" />
+            <div className="absolute inset-0 bg-black/60" />
+          </div>
+        )}
+        <div className="relative z-10 flex flex-col items-center justify-center p-6 text-center text-slate-300">
+          <p className="text-sm font-bold text-white mb-2">{title}</p>
+          <a
+            href={videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors flex items-center gap-2"
+          >
+            <ExternalLink className="w-4 h-4" /> Open in {parsed.platform.toUpperCase()}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. YouTube Player
+  if (parsed.platform === 'youtube') {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+        <iframe
+          src={parsed.embedUrl}
+          title={title}
+          className="absolute inset-0 w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          onError={() => setEmbedError(true)}
+        />
+      </div>
+    );
+  }
+
+  // 3. Facebook Player
+  if (parsed.platform === 'facebook') {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
+        {embedError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300">
+            <p className="text-sm font-bold text-white mb-2">Playing Facebook Video</p>
+            <a
+              href={videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-lg transition-colors flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" /> Open in Facebook
+            </a>
+          </div>
+        ) : (
+          <iframe
+            src={parsed.embedUrl}
+            title={title}
+            className="w-full h-full border-0"
+            style={{ border: 'none', overflow: 'hidden' }}
+            scrolling="no"
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            allowFullScreen
+            onError={() => setEmbedError(true)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // 4. Instagram Player
+  if (parsed.platform === 'instagram') {
+    return (
+      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center p-2 sm:p-4 ${className}`}>
+        {embedError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300">
+            <p className="text-sm font-bold text-white mb-2">Playing Instagram Video</p>
+            <a
+              href={videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" /> Open in Instagram
+            </a>
+          </div>
+        ) : (
+          <iframe
+            src={parsed.embedUrl}
+            title={title}
+            className="w-full max-w-[500px] h-[550px] sm:h-[600px] border-0 rounded-xl bg-white shadow-2xl"
+            scrolling="no"
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            allowFullScreen
+            onError={() => setEmbedError(true)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+      <video
+        src={videoUrl}
+        controls
+        autoPlay={autoPlay}
+        poster={thumbnailUrl || undefined}
+        playsInline
+        className="w-full h-full object-contain max-h-[80vh]"
+      />
+    </div>
+  );
+}

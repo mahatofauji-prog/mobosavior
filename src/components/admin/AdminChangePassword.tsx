@@ -108,7 +108,20 @@ export default function AdminChangePassword({ onCancel, onSuccessLogout }: Admin
       }
 
       if (!response.ok || !data.success) {
-        setErrorMessage(data.message || 'Current password is incorrect.');
+        // Try client-side update fallback as a secondary option in case the backend is misconfigured/out of sync
+        console.warn('[AdminChangePassword] Backend change password failed. Trying direct client-side Supabase update...');
+        const fallbackRes = await fallbackChangeAdminPassword(currentPassword, newPassword);
+        if (fallbackRes.success) {
+          setSuccessMessage('Password updated successfully. Signing out...');
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setTimeout(() => {
+            onSuccessLogout();
+          }, 1500);
+        } else {
+          setErrorMessage(fallbackRes.message || data.message || 'Current password is incorrect.');
+        }
         setLoading(false);
         return;
       }

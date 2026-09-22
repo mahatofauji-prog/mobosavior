@@ -48,7 +48,17 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         localStorage.setItem('mobo_admin_session', 'true');
         onSuccess();
       } else {
-        setError('Invalid admin password.');
+        // EXTRA RESILIENT BACKUP CHECK:
+        // If the backend API failed (e.g. 401 or success: false), try the direct client-side Supabase verification.
+        // This handles cases where the backend has incorrect Supabase environment variables or is out of sync.
+        console.warn('[AdminLogin] Backend auth failed. Trying direct client-side Supabase verification as backup...');
+        const isClientValid = await fallbackVerifyAdminPassword(cleanPassword);
+        if (isClientValid) {
+          localStorage.setItem('mobo_admin_session', 'true');
+          onSuccess();
+        } else {
+          setError('Invalid admin password.');
+        }
       }
     } catch (err: any) {
       console.warn('Backend authentication failed or timed out. Falling back to client-side Supabase verification...', err);

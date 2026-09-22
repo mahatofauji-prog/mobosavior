@@ -126,7 +126,8 @@ export async function fallbackChangeAdminPassword(currentPassword: string, newPa
     const { error } = await safeUpsert('settings', payload);
     if (error) {
       console.error('[fallbackChangeAdminPassword save error]:', error);
-      return { success: false, message: 'Failed to save new password in Supabase.' };
+      const errorMsg = error.message || error.details || JSON.stringify(error);
+      return { success: false, message: `Failed to save new password in Supabase: ${errorMsg}` };
     }
 
     return { success: true, message: 'Password changed successfully.' };

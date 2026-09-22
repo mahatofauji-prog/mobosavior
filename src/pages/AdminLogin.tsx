@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Lock, Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { fallbackVerifyAdminPassword } from '../lib/clientCrypto';
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -19,7 +20,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
     const cleanPassword = password.trim();
 
     try {
-      // Safely validate password against our backend API
+      // 1. Try standard API
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: {
@@ -27,6 +28,19 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         },
         body: JSON.stringify({ password: cleanPassword }),
       });
+
+      // If the API is not supported/configured on static hosts (e.g. 404 or 405), fallback immediately
+      if (response.status === 404 || response.status === 405) {
+        console.warn(`[AdminLogin] API returned ${response.status}. Falling back to client-side Supabase verification...`);
+        const isValid = await fallbackVerifyAdminPassword(cleanPassword);
+        if (isValid) {
+          localStorage.setItem('mobo_admin_session', 'true');
+          onSuccess();
+        } else {
+          setError('Invalid admin password.');
+        }
+        return;
+      }
 
       const data = await response.json();
 
@@ -37,8 +51,19 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         setError('Invalid admin password.');
       }
     } catch (err: any) {
-      console.error('Authentication failed:', err);
-      setError('Invalid admin password.');
+      console.warn('Backend authentication failed or timed out. Falling back to client-side Supabase verification...', err);
+      try {
+        const isValid = await fallbackVerifyAdminPassword(cleanPassword);
+        if (isValid) {
+          localStorage.setItem('mobo_admin_session', 'true');
+          onSuccess();
+        } else {
+          setError('Invalid admin password.');
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback authentication failed:', fallbackErr);
+        setError('Invalid admin password.');
+      }
     } finally {
       setLoading(false);
     }

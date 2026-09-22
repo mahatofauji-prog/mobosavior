@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Eye, EyeOff, Lock, CheckCircle2, AlertCircle, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
+import { fallbackChangeAdminPassword } from '../../lib/clientCrypto';
 
 interface AdminChangePasswordProps {
   onCancel: () => void;
@@ -65,6 +66,7 @@ export default function AdminChangePassword({ onCancel, onSuccessLogout }: Admin
     setLoading(true);
 
     try {
+      // 1. Try standard API
       const response = await fetch('/api/admin/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +76,25 @@ export default function AdminChangePassword({ onCancel, onSuccessLogout }: Admin
           confirmPassword
         })
       });
+
+      // If the API is not supported/configured on static hosts (e.g. 404 or 405), fallback immediately
+      if (response.status === 404 || response.status === 405) {
+        console.warn(`[AdminChangePassword] API returned ${response.status}. Falling back to client-side Supabase password update...`);
+        const fallbackRes = await fallbackChangeAdminPassword(currentPassword, newPassword);
+        if (fallbackRes.success) {
+          setSuccessMessage('Password updated successfully. Signing out...');
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setTimeout(() => {
+            onSuccessLogout();
+          }, 1500);
+        } else {
+          setErrorMessage(fallbackRes.message || 'Current password is incorrect.');
+        }
+        setLoading(false);
+        return;
+      }
 
       const text = await response.text();
       let data: any = {};
@@ -101,8 +122,26 @@ export default function AdminChangePassword({ onCancel, onSuccessLogout }: Admin
         onSuccessLogout();
       }, 1500);
     } catch (err) {
-      setErrorMessage('Failed to connect to backend server. Please try again.');
-      setLoading(false);
+      console.warn('Backend connection failed. Falling back to client-side Supabase password update...', err);
+      try {
+        const fallbackRes = await fallbackChangeAdminPassword(currentPassword, newPassword);
+        if (fallbackRes.success) {
+          setSuccessMessage('Password updated successfully. Signing out...');
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setTimeout(() => {
+            onSuccessLogout();
+          }, 1500);
+        } else {
+          setErrorMessage(fallbackRes.message || 'Current password is incorrect.');
+          setLoading(false);
+        }
+      } catch (fallbackErr: any) {
+        console.error('Fallback change password failed:', fallbackErr);
+        setErrorMessage('Failed to connect to backend server. Please try again.');
+        setLoading(false);
+      }
     }
   };
 

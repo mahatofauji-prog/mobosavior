@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Calendar, Wrench, Image, Play, Star, HelpCircle, 
   FileText, ShieldAlert, Shield, LogOut, Plus, Edit, Trash2, Check, Search, Filter, 
   AlertCircle, Save, Loader2, Sparkles, SlidersHorizontal, Globe, CheckSquare, X, Eye, Phone, MessageSquare,
-  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink, Building2, ShieldCheck
+  Smartphone, Layers, Clock, Share2, MapPin, BarChart2, Database, Tag, DollarSign, Video, Compass, Copy, ExternalLink, Building2, ShieldCheck, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getServiceImage } from '../utils/serviceImages';
@@ -73,10 +73,231 @@ export default function AdminDashboard({
     | 'prices' | 'gallery' | 'videos' | 'reviews' | 'offers' | 'trust' | 'faq'
     | 'contact' | 'hours' | 'social' | 'maps' | 'content' | 'seo' | 'sections'
     | 'analytics' | 'slideshow' | 'media' | 'pages' | 'blog' | 'navigation' | 'media-library' | 'legal'
-    | 'branding-profile' | 'change-password'
+    | 'branding-profile' | 'change-password' | 'push-notifications'
   >('dashboard');
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Web Push Notification state
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<'granted' | 'denied' | 'default' | 'default_dismissed'>('default');
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [isRegisteringPush, setIsRegisteringPush] = useState(false);
+  const [isTestingPush, setIsTestingPush] = useState(false);
+  const [pushError, setPushError] = useState('');
+  const [foregroundBookingAlert, setForegroundBookingAlert] = useState<{ bookingId: string; customerName: string; model: string } | null>(null);
+
+  // Play double-beep synthetic notification sound safely
+  const playNotificationSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playBeep = (delay: number, frequency: number, duration: number) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime + delay);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration);
+      };
+      playBeep(0, 880, 0.15); // A5 note
+      playBeep(0.2, 1046.5, 0.25); // C6 note
+    } catch (err) {
+      console.warn('AudioContext beep play failed:', err);
+    }
+  };
+
+  // Check push support and current subscription status on mount
+  useEffect(() => {
+    const isSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    setPushSupported(isSupported);
+    if (isSupported) {
+      setPushPermission(Notification.permission as any);
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.pushManager.getSubscription().then((sub) => {
+          if (sub) {
+            setPushEnabled(true);
+            localStorage.setItem('mobo_push_enabled', 'true');
+          } else {
+            setPushEnabled(false);
+            localStorage.removeItem('mobo_push_enabled');
+          }
+        });
+      });
+    }
+  }, []);
+
+  // Listen for foreground push messages to show in-app notification & play sound
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      const handleServiceWorkerMessage = (event: MessageEvent) => {
+        const msg = event.data;
+        if (msg && msg.type === 'PUSH_RECEIVED') {
+          console.log('[Admin Portal] Foreground push message received:', msg.payload);
+          playNotificationSound();
+          fetchBookings();
+          if (onRefreshData) onRefreshData();
+          
+          const { title, body, data } = msg.payload;
+          setForegroundBookingAlert({
+            bookingId: data?.bookingId || 'Generic',
+            customerName: data?.customerName || 'New Customer',
+            model: data?.model || 'Device',
+          });
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      };
+    }
+  }, []);
+
+
+  // Listen for push focus signals to highlight the booking (moved below declarations to resolve block-scope error)
+
+
+  const getAdminPasscode = () => {
+    return sessionStorage.getItem('admin_passcode') || '';
+  };
+
+  const handleEnableNotifications = async () => {
+    if (!pushSupported) {
+      alert('Push notifications are not supported on this browser/device.');
+      return;
+    }
+
+    setIsRegisteringPush(true);
+    setPushError('');
+
+    try {
+      const permissionResult = await Notification.requestPermission();
+      setPushPermission(permissionResult as any);
+
+      if (permissionResult === 'granted') {
+        let passcode = getAdminPasscode();
+        if (!passcode) {
+          const promptPasscode = prompt('Please enter the Admin Password to securely register this device:');
+          if (!promptPasscode) {
+            setIsRegisteringPush(false);
+            return;
+          }
+          passcode = promptPasscode;
+          sessionStorage.setItem('admin_passcode', passcode);
+        }
+
+        // Register service worker and subscribe
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        console.log('[Push Client] Service Worker registered:', reg);
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BJZ8rfRrKDAy2tCKAmb_lqGUVfXLOa3wEp90OQz20RnwxrSRjoss2WmaqTt-UIgUUW3OFJeOiT1o1kiBXJctjjc',
+        });
+
+        // Register subscription in Edge Function
+        const response = await fetch('https://cynrkcrjcxpyiuagyvxj.supabase.co/functions/v1/send-new-booking-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'register',
+            passcode,
+            subscription: sub,
+            device_label: navigator.userAgent.includes('Mobile') ? 'Mobile Phone' : 'Desktop Browser',
+            user_agent: navigator.userAgent,
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Failed to save subscription in backend');
+        }
+
+        setPushEnabled(true);
+        localStorage.setItem('mobo_push_enabled', 'true');
+        alert('Web Push notifications enabled successfully on this device!');
+      } else {
+        alert('Notification permission denied. Please enable it in browser settings.');
+      }
+    } catch (err: any) {
+      console.error('[Push Client] Enable failed:', err);
+      setPushError(err.message || 'Failed to enable notifications.');
+      alert(`Failed to enable notifications: ${err.message || 'Server error'}`);
+    } finally {
+      setIsRegisteringPush(false);
+    }
+  };
+
+  const handleTogglePush = async () => {
+    if (pushEnabled) {
+      setIsRegisteringPush(true);
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('https://cynrkcrjcxpyiuagyvxj.supabase.co/functions/v1/send-new-booking-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              type: 'unregister',
+              subscription: sub,
+            }),
+          });
+          await sub.unsubscribe();
+        }
+        setPushEnabled(false);
+        localStorage.removeItem('mobo_push_enabled');
+        alert('Notifications disabled on this device.');
+      } catch (err: any) {
+        console.error('[Push Client] Unsubscribe failed:', err);
+        alert(`Error disabling notifications: ${err.message}`);
+      } finally {
+        setIsRegisteringPush(false);
+      }
+    } else {
+      await handleEnableNotifications();
+    }
+  };
+
+  const handleSendTestNotification = async () => {
+    setIsTestingPush(true);
+    setPushError('');
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        throw new Error('No active subscription found. Please re-enable notifications.');
+      }
+
+      const response = await fetch('https://cynrkcrjcxpyiuagyvxj.supabase.co/functions/v1/send-new-booking-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'test',
+          subscription: sub,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to send test push notification');
+      }
+    } catch (err: any) {
+      console.error('[Push Client] Test push failed:', err);
+      setPushError(err.message || 'Failed to send test notification.');
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
 
   // Close drawer on Escape key
   useEffect(() => {
@@ -355,6 +576,31 @@ export default function AdminDashboard({
       fetchMedia();
     }
   }, [activeTab]);
+
+  // Listen for push focus signals to highlight the booking
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      const handleFocusSignal = (event: MessageEvent) => {
+        const msg = event.data;
+        if (msg && msg.type === 'NOTIFICATION_FOCUS' && msg.bookingId) {
+          console.log('[Admin Portal] Focus signal received for booking ID:', msg.bookingId);
+          fetchBookings();
+          setActiveTab('bookings');
+          setTimeout(() => {
+            const selectEl = document.querySelector(`[data-booking-id="${msg.bookingId}"]`) as HTMLElement;
+            if (selectEl) {
+              selectEl.click();
+              selectEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 1000);
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleFocusSignal);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleFocusSignal);
+      };
+    }
+  }, [bookings]);
 
   const handleSaveGalleryItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1174,6 +1420,7 @@ export default function AdminDashboard({
       title: 'SECURITY & ACCOUNT',
       items: [
         { id: 'change-password' as const, label: 'Change Password', icon: ShieldCheck },
+        { id: 'push-notifications' as const, label: 'Web Push Notifications', icon: Bell },
       ]
     }
   ];
@@ -1188,6 +1435,52 @@ export default function AdminDashboard({
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-700 pb-16 text-left">
+      {/* Foreground booking alert toast */}
+      <AnimatePresence>
+        {foregroundBookingAlert && (
+          <div className="fixed top-20 right-4 z-50 max-w-sm w-full bg-slate-900 border border-slate-800 text-white rounded-2xl shadow-2xl p-4 flex flex-col gap-3 font-sans">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#0284C7]">NEW BOOKING RECEIVED</span>
+              </div>
+              <button 
+                onClick={() => setForegroundBookingAlert(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-black">{foregroundBookingAlert.customerName}</h4>
+              <p className="text-xs text-slate-400">Device: {foregroundBookingAlert.model}</p>
+              <p className="text-[10px] font-mono text-slate-500">ID: {foregroundBookingAlert.bookingId}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const matched = bookings.find(b => b.id === foregroundBookingAlert.bookingId);
+                  if (matched) {
+                    setSelectedBooking(matched);
+                  }
+                  setActiveTab('bookings');
+                  setForegroundBookingAlert(null);
+                }}
+                className="flex-1 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white text-[11px] font-extrabold rounded-lg text-center"
+              >
+                VIEW BOOKING
+              </button>
+              <button
+                onClick={() => setForegroundBookingAlert(null)}
+                className="px-3 py-1.5 border border-slate-700 text-slate-300 hover:bg-slate-800 text-[11px] font-bold rounded-lg"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* 1. PROFESSIONAL ADMIN TOP HEADER */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -1349,6 +1642,52 @@ export default function AdminDashboard({
 
       {/* 3. MAIN CONTENT AREA */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Admin-only Push Notification Permission Prompt */}
+        {pushSupported && pushPermission === 'default' && !pushEnabled && (
+          <div className="bg-gradient-to-r from-sky-500 to-[#0284C7] rounded-2xl p-5 sm:p-6 text-white text-left relative overflow-hidden shadow-lg border border-sky-400/30">
+            {/* Background design elements */}
+            <div className="absolute right-0 bottom-0 translate-y-1/4 translate-x-1/4 opacity-10 pointer-events-none">
+              <Bell className="w-64 h-64" />
+            </div>
+            
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-black uppercase tracking-wider font-sans flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  Enable New Booking Notifications
+                </h3>
+                <p className="text-xs text-sky-100 font-medium">
+                  Receive an instant notification when a new customer booking arrives.
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-2.5 self-start md:self-auto">
+                <button
+                  onClick={handleEnableNotifications}
+                  disabled={isRegisteringPush}
+                  className="px-4 py-2 bg-white text-sky-600 hover:bg-sky-50 font-black text-xs rounded-xl shadow transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                > 
+                  {isRegisteringPush ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Bell className="w-3.5 h-3.5" />
+                  )}
+                  <span>Enable Notifications</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPushPermission('default_dismissed');
+                    localStorage.setItem('mobo_push_dismissed', 'true');
+                  }}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+                > 
+                  Not Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'dashboard' && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
             <div>
@@ -2331,6 +2670,137 @@ export default function AdminDashboard({
 
         {activeTab === 'media-library' && (
           <AdminMediaLibrary />
+        )}
+
+        {activeTab === 'push-notifications' && (
+          <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 sm:p-8 space-y-8 text-left text-slate-700">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight font-sans flex items-center gap-2">
+                <Bell className="w-5 h-5 text-[#0284C7]" />
+                Web Push Notifications
+              </h2>
+              <p className="text-xs font-medium text-slate-500 mt-1">
+                Configure real-time repair booking push notifications for desktop and mobile browsers.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Status and Action Card */}
+              <div className="border border-slate-100 bg-slate-50/50 rounded-2xl p-6 space-y-6">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  System Status & Integration
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-xs font-bold text-slate-600">Browser Compatibility</span>
+                    {pushSupported ? (
+                      <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        SUPPORTED
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-100">
+                        UNSUPPORTED
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-xs font-bold text-slate-600">Permission Status</span>
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-black border uppercase ${
+                      pushPermission === 'granted'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : pushPermission === 'denied'
+                        ? 'bg-rose-50 text-rose-700 border-rose-100'
+                        : 'bg-amber-50 text-amber-700 border-amber-100'
+                    }`}>
+                      {pushPermission}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-xs font-bold text-slate-600">Push Status on this Device</span>
+                    {pushEnabled ? (
+                      <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        ACTIVE
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
+                        INACTIVE
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <button
+                    onClick={handleTogglePush}
+                    disabled={isRegisteringPush || !pushSupported}
+                    className={`w-full py-3 px-4 font-black text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 focus:outline-none cursor-pointer ${
+                      pushEnabled
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/10'
+                        : 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-sky-600/10'
+                    }`}
+                  >
+                    {isRegisteringPush ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : pushEnabled ? (
+                      <X className="w-4 h-4" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                    <span>{pushEnabled ? 'Disable Notifications on this Device' : 'Enable Notifications on this Device'}</span>
+                  </button>
+
+                  {pushEnabled && (
+                    <button
+                      onClick={handleSendTestNotification}
+                      disabled={isTestingPush}
+                      className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 focus:outline-none cursor-pointer"
+                    >
+                      {isTestingPush ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+                      ) : (
+                        <Play className="w-4 h-4 text-slate-500 fill-slate-500" />
+                      )}
+                      <span>Send Test Push Notification</span>
+                    </button>
+                  )}
+                </div>
+
+                {pushError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-800 text-[11px] font-semibold flex items-start gap-1.5 text-left">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 mt-0.5" />
+                    <span>Error: {pushError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Information and FAQ Card */}
+              <div className="border border-slate-100 rounded-2xl p-6 space-y-4 bg-white text-left">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  How Web Push Works
+                </h3>
+
+                <div className="space-y-4 text-xs font-medium leading-relaxed text-slate-600">
+                  <div className="space-y-1">
+                    <p className="font-bold text-slate-800">1. Device Specific Subscriptions</p>
+                    <p>Push subscriptions are linked to this specific browser and device. If you log in from your mobile phone and your laptop, you can register both to receive notifications on both devices.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="font-bold text-slate-800">2. Instant Booking Alerts</p>
+                    <p>Whenever a customer submits a repair booking, the database fires an automatic trigger to our Supabase Edge Function which securely distributes native notification banners to all of your active admin devices.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="font-bold text-slate-800">3. Troubleshooting Notification Blocks</p>
+                    <p>If you aren't receiving notifications, ensure that your operating system (Windows/macOS/iOS/Android) has allowed browser notifications in its settings app, and browser permissions are granted for this website.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </main>
 

@@ -121,6 +121,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         const isValid = await fallbackVerifyAdminPassword(cleanPassword);
         if (isValid) {
           localStorage.setItem('mobo_admin_session', 'true');
+          sessionStorage.setItem('admin_passcode', cleanPassword);
           onSuccess();
         } else {
           setError('Invalid admin password.');
@@ -132,6 +133,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
 
       if (data.success) {
         localStorage.setItem('mobo_admin_session', 'true');
+        sessionStorage.setItem('admin_passcode', cleanPassword);
         onSuccess();
       } else {
         // EXTRA RESILIENT BACKUP CHECK:
@@ -141,6 +143,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         const isClientValid = await fallbackVerifyAdminPassword(cleanPassword);
         if (isClientValid) {
           localStorage.setItem('mobo_admin_session', 'true');
+          sessionStorage.setItem('admin_passcode', cleanPassword);
           onSuccess();
         } else {
           setError('Invalid admin password.');
@@ -152,6 +155,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         const isValid = await fallbackVerifyAdminPassword(cleanPassword);
         if (isValid) {
           localStorage.setItem('mobo_admin_session', 'true');
+          sessionStorage.setItem('admin_passcode', cleanPassword);
           onSuccess();
         } else {
           setError('Invalid admin password.');

@@ -213,6 +213,29 @@ export default function BookingForm({
         new Promise((resolve) => setTimeout(resolve, 4000))
       ]);
 
+      // Fire-and-forget direct trigger for Web Push notification (guarantees instant delivery even if DB webhook has delays)
+      try {
+        fetch('https://cynrkcrjcxpyiuagyvxj.supabase.co/functions/v1/send-new-booking-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: serviceId,
+            service_id: serviceId,
+            customer_name: customerName,
+            mobile_brand: mobileBrand,
+            mobile_model: mobileModel,
+            problem: problem,
+            preferred_date: preferredDate,
+            preferred_time: preferredTime,
+            status: 'Booking Received'
+          }),
+        }).catch(e => console.warn('Non-blocking direct push call caught:', e));
+      } catch (e) {
+        console.warn('Direct push trigger failed:', e);
+      }
+
       // Also forward booking to WOWSQL if connected
 
       // Clean up previews

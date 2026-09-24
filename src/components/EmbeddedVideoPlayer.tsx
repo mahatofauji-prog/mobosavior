@@ -21,7 +21,7 @@ export default function EmbeddedVideoPlayer({
   const safeVideoUrl = typeof videoUrl === 'string' ? videoUrl.trim() : '';
   const parsed = parseVideoUrl(safeVideoUrl);
 
-  if (!safeVideoUrl || !parsed || !parsed.isValid || embedError) {
+  if (!safeVideoUrl || !parsed || !parsed.isValid) {
     return (
       <div className={`flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300 rounded-2xl ${className}`}>
         <AlertCircle className="w-10 h-10 text-amber-400 mb-2.5" />
@@ -108,7 +108,6 @@ export default function EmbeddedVideoPlayer({
           className="absolute inset-0 w-full h-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
-          onError={() => setEmbedError(true)}
         />
       </div>
     );
@@ -118,30 +117,15 @@ export default function EmbeddedVideoPlayer({
   if (parsed.platform === 'facebook') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
-        {embedError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300">
-            <p className="text-sm font-bold text-white mb-2">Playing Facebook Video</p>
-            <a
-              href={videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-lg transition-colors flex items-center gap-2"
-            >
-              <ExternalLink className="w-4 h-4" /> Open in Facebook
-            </a>
-          </div>
-        ) : (
-          <iframe
-            src={parsed.embedUrl}
-            title={title}
-            className="w-full h-full border-0"
-            style={{ border: 'none', overflow: 'hidden' }}
-            scrolling="no"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            allowFullScreen
-            onError={() => setEmbedError(true)}
-          />
-        )}
+        <iframe
+          src={parsed.embedUrl}
+          title={title}
+          className="w-full h-full border-0"
+          style={{ border: 'none', overflow: 'hidden' }}
+          scrolling="no"
+          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          allowFullScreen
+        />
       </div>
     );
   }
@@ -150,29 +134,14 @@ export default function EmbeddedVideoPlayer({
   if (parsed.platform === 'instagram') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center p-2 sm:p-4 ${className}`}>
-        {embedError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300">
-            <p className="text-sm font-bold text-white mb-2">Playing Instagram Video</p>
-            <a
-              href={videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl shadow-lg transition-colors flex items-center gap-2"
-            >
-              <ExternalLink className="w-4 h-4" /> Open in Instagram
-            </a>
-          </div>
-        ) : (
-          <iframe
-            src={parsed.embedUrl}
-            title={title}
-            className="w-full max-w-[500px] h-[550px] sm:h-[600px] border-0 rounded-xl bg-white shadow-2xl"
-            scrolling="no"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            allowFullScreen
-            onError={() => setEmbedError(true)}
-          />
-        )}
+        <iframe
+          src={parsed.embedUrl}
+          title={title}
+          className="w-full max-w-[500px] h-[550px] sm:h-[600px] border-0 rounded-xl bg-white shadow-2xl"
+          scrolling="no"
+          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          allowFullScreen
+        />
       </div>
     );
   }

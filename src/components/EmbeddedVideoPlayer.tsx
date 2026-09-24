@@ -18,6 +18,7 @@ export default function EmbeddedVideoPlayer({
   autoPlay = false
 }: EmbeddedVideoPlayerProps) {
   const [embedError, setEmbedError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const safeVideoUrl = typeof videoUrl === 'string' ? videoUrl.trim() : '';
   const parsed = parseVideoUrl(safeVideoUrl);
 
@@ -55,17 +56,35 @@ export default function EmbeddedVideoPlayer({
       safeVideoUrl.includes('/storage/')
     );
 
+  const renderLoader = () => {
+    if (!isLoading) return null;
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-30 transition-all duration-300 pointer-events-none">
+        <div className="w-11 h-11 border-4 border-sky-500/10 border-t-sky-500 rounded-full animate-spin mb-3.5" />
+        <span className="text-[11px] font-extrabold text-sky-400 tracking-wider uppercase font-sans">Connecting Safe Stream...</span>
+        <span className="text-[9px] text-slate-500 mt-1 font-medium">Bypassing platform trackers & loading video player</span>
+      </div>
+    );
+  };
+
   if (isDirectVideo) {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+        {renderLoader()}
         <video
           src={safeVideoUrl}
           controls
           autoPlay={autoPlay}
+          preload="auto"
           poster={thumbnailUrl || undefined}
           playsInline
           className="w-full h-full object-contain max-h-[80vh]"
-          onError={() => setEmbedError(true)}
+          onLoadedData={() => setIsLoading(false)}
+          onCanPlay={() => setIsLoading(false)}
+          onError={() => {
+            setEmbedError(true);
+            setIsLoading(false);
+          }}
         >
           Your browser does not support HTML5 video playback.
         </video>
@@ -102,12 +121,14 @@ export default function EmbeddedVideoPlayer({
   if (parsed.platform === 'youtube') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+        {renderLoader()}
         <iframe
           src={parsed.embedUrl}
           title={title}
           className="absolute inset-0 w-full h-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+          onLoad={() => setIsLoading(false)}
         />
       </div>
     );
@@ -117,6 +138,7 @@ export default function EmbeddedVideoPlayer({
   if (parsed.platform === 'facebook') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
+        {renderLoader()}
         <iframe
           src={parsed.embedUrl}
           title={title}
@@ -125,6 +147,7 @@ export default function EmbeddedVideoPlayer({
           scrolling="no"
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
           allowFullScreen
+          onLoad={() => setIsLoading(false)}
         />
       </div>
     );
@@ -134,6 +157,7 @@ export default function EmbeddedVideoPlayer({
   if (parsed.platform === 'instagram') {
     return (
       <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center p-2 sm:p-4 ${className}`}>
+        {renderLoader()}
         <iframe
           src={parsed.embedUrl}
           title={title}
@@ -141,6 +165,7 @@ export default function EmbeddedVideoPlayer({
           scrolling="no"
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
           allowFullScreen
+          onLoad={() => setIsLoading(false)}
         />
       </div>
     );
@@ -148,13 +173,17 @@ export default function EmbeddedVideoPlayer({
 
   return (
     <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+      {renderLoader()}
       <video
         src={videoUrl}
         controls
+        preload="auto"
         autoPlay={autoPlay}
         poster={thumbnailUrl || undefined}
         playsInline
         className="w-full h-full object-contain max-h-[80vh]"
+        onLoadedData={() => setIsLoading(false)}
+        onCanPlay={() => setIsLoading(false)}
       />
     </div>
   );

@@ -22,6 +22,33 @@ export default function EmbeddedVideoPlayer({
   const safeVideoUrl = typeof videoUrl === 'string' ? videoUrl.trim() : '';
   const parsed = parseVideoUrl(safeVideoUrl);
 
+  // Guess initial aspect ratio to avoid layout shift (9/16 for Shorts/Reels/Instagram, 16/9 for others)
+  const getInitialAspectRatio = () => {
+    if (!parsed) return 16 / 9;
+    if (parsed.platform === 'youtube') {
+      if (safeVideoUrl.toLowerCase().includes('/shorts/')) {
+        return 9 / 16;
+      }
+      return 16 / 9;
+    }
+    if (parsed.platform === 'facebook') {
+      if (
+        safeVideoUrl.toLowerCase().includes('/reel/') ||
+        safeVideoUrl.toLowerCase().includes('/reels/') ||
+        safeVideoUrl.toLowerCase().includes('share/r/')
+      ) {
+        return 9 / 16;
+      }
+      return 16 / 9;
+    }
+    if (parsed.platform === 'instagram') {
+      return 9 / 16; // Instagram embeds and reels look amazing in vertical 9:16 aspect ratio
+    }
+    return 16 / 9;
+  };
+
+  const [aspectRatio, setAspectRatio] = useState<number>(getInitialAspectRatio());
+
   if (!safeVideoUrl || !parsed || !parsed.isValid) {
     return (
       <div className={`flex flex-col items-center justify-center p-6 text-center bg-slate-900 text-slate-300 rounded-2xl ${className}`}>
@@ -67,9 +94,30 @@ export default function EmbeddedVideoPlayer({
     );
   };
 
+  // Determine container styling: aspect-ratio is key to responsive frames!
+  const playerContainerStyle: React.CSSProperties = {
+    aspectRatio: `${aspectRatio}`,
+    width: '100%',
+    maxWidth: '100%',
+    maxHeight: '75vh',
+    height: 'auto',
+  };
+
+  // Callback to detect direct video metadata dimensions and update aspect ratio dynamically
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (video.videoWidth && video.videoHeight) {
+      setAspectRatio(video.videoWidth / video.videoHeight);
+    }
+    setIsLoading(false);
+  };
+
   if (isDirectVideo) {
     return (
-      <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+      <div 
+        style={playerContainerStyle}
+        className="relative bg-black overflow-hidden flex items-center justify-center mx-auto rounded-2xl shadow-xl transition-all duration-300"
+      >
         {renderLoader()}
         <video
           src={safeVideoUrl}
@@ -78,7 +126,8 @@ export default function EmbeddedVideoPlayer({
           preload="auto"
           poster={thumbnailUrl || undefined}
           playsInline
-          className="w-full h-full object-contain max-h-[80vh]"
+          className="w-full h-full object-contain"
+          onLoadedMetadata={handleLoadedMetadata}
           onLoadedData={() => setIsLoading(false)}
           onCanPlay={() => setIsLoading(false)}
           onError={() => {
@@ -120,7 +169,10 @@ export default function EmbeddedVideoPlayer({
   // 2. YouTube Player
   if (parsed.platform === 'youtube') {
     return (
-      <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+      <div 
+        style={playerContainerStyle}
+        className="relative bg-black overflow-hidden flex items-center justify-center mx-auto rounded-2xl shadow-xl transition-all duration-300"
+      >
         {renderLoader()}
         <iframe
           src={parsed.embedUrl}
@@ -137,12 +189,15 @@ export default function EmbeddedVideoPlayer({
   // 3. Facebook Player
   if (parsed.platform === 'facebook') {
     return (
-      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center ${className}`}>
+      <div 
+        style={playerContainerStyle}
+        className="relative bg-black overflow-hidden flex items-center justify-center mx-auto rounded-2xl shadow-xl transition-all duration-300"
+      >
         {renderLoader()}
         <iframe
           src={parsed.embedUrl}
           title={title}
-          className="w-full h-full border-0"
+          className="absolute inset-0 w-full h-full border-0"
           style={{ border: 'none', overflow: 'hidden' }}
           scrolling="no"
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
@@ -156,12 +211,15 @@ export default function EmbeddedVideoPlayer({
   // 4. Instagram Player
   if (parsed.platform === 'instagram') {
     return (
-      <div className={`relative w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center p-2 sm:p-4 ${className}`}>
+      <div 
+        style={playerContainerStyle}
+        className="relative bg-black overflow-hidden flex items-center justify-center mx-auto rounded-2xl shadow-xl p-1 transition-all duration-300"
+      >
         {renderLoader()}
         <iframe
           src={parsed.embedUrl}
           title={title}
-          className="w-full max-w-[500px] h-[550px] sm:h-[600px] border-0 rounded-xl bg-white shadow-2xl"
+          className="absolute inset-0 w-full h-full border-0 rounded-xl bg-white shadow-md"
           scrolling="no"
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
           allowFullScreen
@@ -172,7 +230,10 @@ export default function EmbeddedVideoPlayer({
   }
 
   return (
-    <div className={`relative w-full h-full bg-black overflow-hidden flex items-center justify-center ${className}`}>
+    <div 
+      style={playerContainerStyle}
+      className="relative bg-black overflow-hidden flex items-center justify-center mx-auto rounded-2xl shadow-xl transition-all duration-300"
+    >
       {renderLoader()}
       <video
         src={videoUrl}
@@ -181,7 +242,8 @@ export default function EmbeddedVideoPlayer({
         autoPlay={autoPlay}
         poster={thumbnailUrl || undefined}
         playsInline
-        className="w-full h-full object-contain max-h-[80vh]"
+        className="w-full h-full object-contain"
+        onLoadedMetadata={handleLoadedMetadata}
         onLoadedData={() => setIsLoading(false)}
         onCanPlay={() => setIsLoading(false)}
       />

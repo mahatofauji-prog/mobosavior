@@ -317,7 +317,7 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
               {/* Left Media Area */}
               <div className="md:w-3/5 bg-black flex items-center justify-center relative min-h-[300px] md:min-h-0">
                 {(activeItem.mediaType === 'video' || activeItem.videoUrl) && activeItem.videoUrl ? (
-                  <div className="w-full h-full relative aspect-video flex items-center justify-center">
+                  <div className="w-full h-full relative flex items-center justify-center">
                     <ErrorBoundary componentName="Gallery Video Player">
                       <EmbeddedVideoPlayer
                         videoUrl={activeItem.videoUrl}

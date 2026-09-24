@@ -45,9 +45,11 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
     'is_active', 'active', 'service_prices', 'available_services', 'created_at', 'updated_at'
   ],
   prices: [
-    'id', 'service_id', 'service_slug', 'service_name', 'category', 'brand_id',
-    'brand', 'model_id', 'model', 'display_variant', 'price_type', 'amount',
-    'currency', 'notes', 'is_active', 'active', 'display_order', 'created_at', 'updated_at'
+    'id', 'service_id', 'serviceId', 'service_slug', 'serviceSlug', 'service_name', 'serviceName',
+    'category', 'brand_id', 'brandId', 'brand', 'model_id', 'modelId', 'model',
+    'displayVariant', 'display_variant', 'priceType', 'price_type', 'amount', 'price',
+    'currency', 'notes', 'warranty', 'turnaround_time', 'is_active', 'active', 'isActive',
+    'display_order', 'displayOrder', 'created_at', 'createdAt', 'updated_at', 'updatedAt'
   ],
   gallery: [
     'id', 'title', 'description', 'category', 'media_type', 'image_url', 'video_url',

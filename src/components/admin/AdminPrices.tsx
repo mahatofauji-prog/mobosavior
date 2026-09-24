@@ -257,34 +257,24 @@ export default function AdminPrices({ onRefreshData }: AdminPricesProps = {}) {
       const cleanPayload = sanitizePayload('prices', payload);
       let savedRecord: any = null;
 
-      if (isEdit) {
-        const { data: updateRes, error: updateErr } = await supabase
-          .from('prices')
-          .update(cleanPayload)
-          .eq('id', id)
-          .select()
-          .single();
-
-        if (updateErr) {
-          console.error('[MOBO ADMIN SAVE ERROR - prices update]:', { table: 'prices', id, error: updateErr });
-          throw updateErr;
-        }
-        savedRecord = updateRes;
-      } else {
-        cleanPayload.id = id;
+      // Ensure id is always set in payload for upsert
+      cleanPayload.id = id;
+      if (!isEdit) {
         cleanPayload.created_at = now;
-        const { data: insertRes, error: insertErr } = await supabase
-          .from('prices')
-          .insert(cleanPayload)
-          .select()
-          .single();
-
-        if (insertErr) {
-          console.error('[MOBO ADMIN SAVE ERROR - prices insert]:', { table: 'prices', id, error: insertErr });
-          throw insertErr;
-        }
-        savedRecord = insertRes;
       }
+
+      // Real Supabase UPSERT to handle both existing and default preset price items
+      const { data: upsertRes, error: upsertErr } = await supabase
+        .from('prices')
+        .upsert(cleanPayload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (upsertErr) {
+        console.error('[MOBO ADMIN SAVE ERROR - prices upsert]:', { table: 'prices', id, error: upsertErr });
+        throw upsertErr;
+      }
+      savedRecord = upsertRes;
 
       const mappedSaved: PriceItem = {
         id: savedRecord.id || id,

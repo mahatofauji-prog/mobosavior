@@ -100,7 +100,7 @@ export default function HomeGalleryPreview({ onNavigate }: HomeGalleryPreviewPro
                       title={item.title}
                       lightTheme={true}
                     />
-                  ) : item.mediaType === 'video' ? (
+                  ) : (item.mediaType === 'video' || item.videoUrl) ? (
                     <div
                       onClick={() => setActiveModal(item)}
                       className="relative cursor-pointer group"
@@ -198,7 +198,7 @@ export default function HomeGalleryPreview({ onNavigate }: HomeGalleryPreviewPro
                 </button>
               </div>
 
-              {activeModal.mediaType === 'video' && activeModal.videoUrl ? (
+              {(activeModal.mediaType === 'video' || activeModal.videoUrl) && activeModal.videoUrl ? (
                 <div className="relative w-full min-h-[300px] max-h-[75vh] bg-black rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
                   <ErrorBoundary componentName="Video Player">
                     <EmbeddedVideoPlayer

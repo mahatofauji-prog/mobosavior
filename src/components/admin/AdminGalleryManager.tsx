@@ -347,6 +347,8 @@ export default function AdminGalleryManager() {
         title: title || (mediaType === 'video' ? 'Repair Video' : 'Repair Gallery Item'),
         description: description || '',
         category: finalCategoryId,
+        mediaType: mediaType,
+        media_type: mediaType,
         image_url: mediaType === 'video' ? officialThumbnailUrl : (finalImageUrl || finalAfterUrl || finalBeforeUrl || null),
         video_url: finalVideoUrl || null,
         before_image_url: finalBeforeUrl || null,

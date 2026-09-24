@@ -6,7 +6,7 @@ import BeforeAfterSlider from '../components/BeforeAfterSlider';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import VideoThumbnail from '../components/VideoThumbnail';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { getVideoPlatformLabel } from '../lib/videoUtils';
+import { getVideoPlatformLabel, parseVideoUrl } from '../lib/videoUtils';
 import { Eye, Calendar, Sparkles, X, MessageSquare, AlertCircle, Play, Search, Filter, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -21,6 +21,31 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeItem, setActiveItem] = useState<GalleryItem | null>(null);
+  const [modalAspectRatio, setModalAspectRatio] = useState<number>(1.6);
+
+  useEffect(() => {
+    if (activeItem) {
+      const url = activeItem.videoUrl || '';
+      const parsed = parseVideoUrl(url);
+      if (parsed) {
+        if (parsed.platform === 'instagram') {
+          setModalAspectRatio(9 / 16);
+        } else if (parsed.platform === 'youtube' && url.toLowerCase().includes('/shorts/')) {
+          setModalAspectRatio(9 / 16);
+        } else if (parsed.platform === 'facebook' && (
+          url.toLowerCase().includes('/reel/') ||
+          url.toLowerCase().includes('/reels/') ||
+          url.toLowerCase().includes('share/r/')
+        )) {
+          setModalAspectRatio(9 / 16);
+        } else {
+          setModalAspectRatio(16 / 9);
+        }
+      } else {
+        setModalAspectRatio(1.6);
+      }
+    }
+  }, [activeItem]);
 
   useEffect(() => {
     async function fetchGallery() {
@@ -298,111 +323,136 @@ export default function Gallery({ onNavigate, contactWhatsapp }: GalleryProps) {
 
       {/* Lightbox / Media Modal */}
       <AnimatePresence>
-        {activeItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/90 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative max-w-4xl w-full bg-slate-900 text-white rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-auto max-h-[90vh] border border-slate-800"
-            >
-              <button
-                onClick={() => setActiveItem(null)}
-                className="absolute top-4 right-4 z-20 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80 transition-colors focus:outline-none"
-                aria-label="Close lightbox"
+        {activeItem && (() => {
+          const isModalPortrait = modalAspectRatio < 1;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/90 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={`relative w-full bg-slate-900 text-white rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-800 transition-all duration-300 ${
+                  isModalPortrait 
+                    ? 'max-w-md max-h-[92vh] h-auto' 
+                    : 'max-w-4xl md:flex-row h-auto max-h-[90vh]'
+                }`}
               >
-                <X className="w-5 h-5" />
-              </button>
+                <button
+                  onClick={() => setActiveItem(null)}
+                  className="absolute top-4 right-4 z-20 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80 transition-colors focus:outline-none"
+                  aria-label="Close lightbox"
+                >
+                  <X className="w-5 h-5" />
+                </button>
 
-              {/* Left Media Area */}
-              <div className="md:w-3/5 bg-black flex items-center justify-center relative min-h-[300px] md:min-h-0">
-                {(activeItem.mediaType === 'video' || activeItem.videoUrl) && activeItem.videoUrl ? (
-                  <div className="w-full h-full relative flex items-center justify-center">
-                    <ErrorBoundary componentName="Gallery Video Player">
-                      <EmbeddedVideoPlayer
-                        videoUrl={activeItem.videoUrl}
-                        title={activeItem.title}
-                        thumbnailUrl={activeItem.thumbnailUrl || activeItem.imageUrl}
-                        className="w-full h-full"
-                      />
-                    </ErrorBoundary>
-                  </div>
-                ) : activeItem.mediaType === 'before_after' && activeItem.beforeImageUrl && activeItem.afterImageUrl ? (
-                  <div className="w-full p-4">
-                    <BeforeAfterSlider
-                      beforeImage={activeItem.beforeImageUrl}
-                      afterImage={activeItem.afterImageUrl}
-                      title={activeItem.title}
-                    />
-                  </div>
-                ) : (
-                  <img
-                    src={activeItem.imageUrl}
-                    alt={activeItem.title}
-                    className="max-h-[50vh] md:max-h-[80vh] w-full object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-              </div>
-
-              {/* Right Details Area */}
-              <div className="md:w-2/5 p-6 sm:p-8 flex flex-col justify-between space-y-6 text-slate-300 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 bg-sky-950 text-sky-400 border border-sky-800/60 rounded-full text-[9px] font-black uppercase">
-                        {getCategoryLabel(activeItem.category)}
-                      </span>
-                      {activeItem.brand && (
-                        <span className="text-[10px] text-slate-400 font-bold">
-                          {activeItem.brand} {activeItem.model ? `• ${activeItem.model}` : ''}
-                        </span>
-                      )}
+                {/* Left Media Area */}
+                <div 
+                  className={`bg-black flex items-center justify-center relative transition-all duration-300 ${
+                    isModalPortrait 
+                      ? 'w-full mx-auto' 
+                      : 'md:w-3/5 min-h-[300px] md:min-h-0'
+                  }`}
+                  style={isModalPortrait ? {
+                    aspectRatio: `${modalAspectRatio}`,
+                    maxHeight: '55vh',
+                    width: '100%'
+                  } : {}}
+                >
+                  {(activeItem.mediaType === 'video' || activeItem.videoUrl) && activeItem.videoUrl ? (
+                    <div className="w-full h-full relative flex items-center justify-center">
+                      <ErrorBoundary componentName="Gallery Video Player">
+                        <EmbeddedVideoPlayer
+                          videoUrl={activeItem.videoUrl}
+                          title={activeItem.title}
+                          thumbnailUrl={activeItem.thumbnailUrl || activeItem.imageUrl}
+                          className="w-full h-full"
+                          onAspectRatioChange={setModalAspectRatio}
+                        />
+                      </ErrorBoundary>
                     </div>
-                    <h3 className="text-xl font-black text-white leading-snug font-sans">
-                      {activeItem.title}
-                    </h3>
-                  </div>
-
-                  <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                    {activeItem.description}
-                  </p>
+                  ) : activeItem.mediaType === 'before_after' && activeItem.beforeImageUrl && activeItem.afterImageUrl ? (
+                    <div className="w-full p-4">
+                      <BeforeAfterSlider
+                        beforeImage={activeItem.beforeImageUrl}
+                        afterImage={activeItem.afterImageUrl}
+                        title={activeItem.title}
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={activeItem.imageUrl}
+                      alt={activeItem.title}
+                      className="max-h-[50vh] md:max-h-[80vh] w-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-slate-800">
-                  <div className="flex gap-4 text-[11px] text-slate-400 font-bold">
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <ShieldCheck className="w-4 h-4" />
-                      100% Verified Quality
-                    </span>
+                {/* Right Details Area */}
+                <div 
+                  className={`p-6 sm:p-8 flex flex-col justify-between space-y-6 text-slate-300 bg-slate-900 transition-all duration-300 ${
+                    isModalPortrait 
+                      ? 'w-full border-t border-slate-800 max-h-[35vh] overflow-y-auto' 
+                      : 'md:w-2/5 border-t md:border-t-0 md:border-l border-slate-800'
+                  }`}
+                >
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 bg-sky-950 text-sky-400 border border-sky-800/60 rounded-full text-[9px] font-black uppercase">
+                          {getCategoryLabel(activeItem.category)}
+                        </span>
+                        {activeItem.brand && (
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            {activeItem.brand} {activeItem.model ? `• ${activeItem.model}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-xl font-black text-white leading-snug font-sans">
+                        {activeItem.title}
+                      </h3>
+                    </div>
+
+                    <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                      {activeItem.description}
+                    </p>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        onNavigate('book-repair');
-                        setActiveItem(null);
-                      }}
-                      className="py-3 px-4 bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-black rounded-xl text-center shadow-md"
-                    >
-                      BOOK REPAIR
-                    </button>
-                    <a
-                      href={formattedWhatsappLink(activeItem.title)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl text-center flex items-center justify-center gap-1.5"
-                    >
-                      <MessageSquare className="w-4 h-4 fill-white text-emerald-600" />
-                      WHATSAPP
-                    </a>
+                  <div className="space-y-4 pt-6 border-t border-slate-800">
+                    <div className="flex gap-4 text-[11px] text-slate-400 font-bold">
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <ShieldCheck className="w-4 h-4" />
+                        100% Verified Quality
+                      </span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          onNavigate('book-repair');
+                          setActiveItem(null);
+                        }}
+                        className="py-3 px-4 bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-black rounded-xl text-center shadow-md"
+                      >
+                        BOOK REPAIR
+                      </button>
+                      <a
+                        href={formattedWhatsappLink(activeItem.title)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl text-center flex items-center justify-center gap-1.5"
+                      >
+                        <MessageSquare className="w-4 h-4 fill-white text-emerald-600" />
+                        WHATSAPP
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

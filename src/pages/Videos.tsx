@@ -5,6 +5,7 @@ import { VideoItem, getCategoryLabel } from '../types';
 import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import VideoThumbnail from '../components/VideoThumbnail';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { parseVideoUrl } from '../lib/videoUtils';
 import { Play, Calendar, Eye, Sparkles, X, MessageSquare, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -42,6 +43,31 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
+  const [modalAspectRatio, setModalAspectRatio] = useState<number>(1.6);
+
+  useEffect(() => {
+    if (activeVideo) {
+      const url = activeVideo.videoUrl || '';
+      const parsed = parseVideoUrl(url);
+      if (parsed) {
+        if (parsed.platform === 'instagram') {
+          setModalAspectRatio(9 / 16);
+        } else if (parsed.platform === 'youtube' && url.toLowerCase().includes('/shorts/')) {
+          setModalAspectRatio(9 / 16);
+        } else if (parsed.platform === 'facebook' && (
+          url.toLowerCase().includes('/reel/') ||
+          url.toLowerCase().includes('/reels/') ||
+          url.toLowerCase().includes('share/r/')
+        )) {
+          setModalAspectRatio(9 / 16);
+        } else {
+          setModalAspectRatio(16 / 9);
+        }
+      } else {
+        setModalAspectRatio(1.6);
+      }
+    }
+  }, [activeVideo]);
 
   useEffect(() => {
     async function fetchVideos() {
@@ -226,66 +252,87 @@ export default function Videos({ onNavigate, contactWhatsapp }: VideosProps) {
 
       {/* Dynamic Video Player Modal Overlay */}
       <AnimatePresence>
-        {activeVideo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative max-w-3xl w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col"
-            >
-              {/* Close Overlay */}
-              <button
-                onClick={() => setActiveVideo(null)}
-                className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/40 text-white hover:bg-black/60 transition-colors focus:outline-none"
-                aria-label="Close video player"
+        {activeVideo && (() => {
+          const isModalPortrait = modalAspectRatio < 1;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={`relative w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-800 transition-all duration-300 ${
+                  isModalPortrait 
+                    ? 'max-w-md max-h-[92vh] h-auto' 
+                    : 'max-w-3xl max-h-[90vh] h-auto'
+                }`}
               >
-                <X className="w-5 h-5" />
-              </button>
+                {/* Close Overlay */}
+                <button
+                  onClick={() => setActiveVideo(null)}
+                  className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-black/40 text-white hover:bg-black/60 transition-colors focus:outline-none"
+                  aria-label="Close video player"
+                >
+                  <X className="w-5 h-5" />
+                </button>
 
-              {/* Player wrapper */}
-              <div className="relative min-h-[320px] max-h-[80vh] bg-black w-full flex items-center justify-center overflow-hidden">
-                <ErrorBoundary componentName="Video Player Overlay">
-                  <EmbeddedVideoPlayer
-                    videoUrl={activeVideo.videoUrl}
-                    title={activeVideo.title}
-                    thumbnailUrl={activeVideo.thumbnailUrl}
-                    autoPlay={true}
-                  />
-                </ErrorBoundary>
-              </div>
+                {/* Player wrapper */}
+                <div 
+                  className={`bg-black flex items-center justify-center relative overflow-hidden transition-all duration-300 ${
+                    isModalPortrait ? 'w-full mx-auto' : 'w-full aspect-video'
+                  }`}
+                  style={isModalPortrait ? {
+                    aspectRatio: `${modalAspectRatio}`,
+                    maxHeight: '55vh',
+                    width: '100%'
+                  } : {}}
+                >
+                  <ErrorBoundary componentName="Video Player Overlay">
+                    <EmbeddedVideoPlayer
+                      videoUrl={activeVideo.videoUrl}
+                      title={activeVideo.title}
+                      thumbnailUrl={activeVideo.thumbnailUrl}
+                      autoPlay={true}
+                      onAspectRatioChange={setModalAspectRatio}
+                    />
+                  </ErrorBoundary>
+                </div>
 
-              {/* Bottom Info bar */}
-              <div className="p-6 bg-white text-slate-700 text-left space-y-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-[#0284C7]">{activeVideo.category}</span>
-                  <h4 className="text-lg font-black text-slate-900 font-sans">{activeVideo.title}</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">{activeVideo.description}</p>
+                {/* Bottom Info bar */}
+                <div 
+                  className={`p-6 bg-white text-slate-700 text-left space-y-4 overflow-y-auto transition-all duration-300 ${
+                    isModalPortrait ? 'max-h-[35vh] w-full' : ''
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-[#0284C7]">{activeVideo.category}</span>
+                    <h4 className="text-lg font-black text-slate-900 font-sans">{activeVideo.title}</h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">{activeVideo.description}</p>
+                  </div>
+                  <div className="border-t border-slate-100 pt-4 flex gap-2 justify-end">
+                    <button
+                      onClick={() => {
+                        onNavigate('book-repair');
+                        setActiveVideo(null);
+                      }}
+                      className="py-2 px-4 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl"
+                    >
+                      BOOK THIS TYPE OF REPAIR
+                    </button>
+                    <a
+                      href={formattedWhatsappLink(activeVideo.title)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5"
+                    >
+                      <MessageSquare className="w-4 h-4 fill-white text-emerald-500" />
+                      WHATSAPP INQUIRY
+                    </a>
+                  </div>
                 </div>
-                <div className="border-t border-slate-100 pt-4 flex gap-2 justify-end">
-                  <button
-                    onClick={() => {
-                      onNavigate('book-repair');
-                      setActiveVideo(null);
-                    }}
-                    className="py-2 px-4 bg-[#0284C7] hover:bg-[#0369A1] text-white font-extrabold text-xs rounded-xl"
-                  >
-                    BOOK THIS TYPE OF REPAIR
-                  </button>
-                  <a
-                    href={formattedWhatsappLink(activeVideo.title)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5"
-                  >
-                    <MessageSquare className="w-4 h-4 fill-white text-emerald-500" />
-                    WHATSAPP INQUIRY
-                  </a>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

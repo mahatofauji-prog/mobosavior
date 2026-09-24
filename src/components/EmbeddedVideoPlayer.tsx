@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { parseVideoUrl } from '../lib/videoUtils';
 import { AlertCircle, ExternalLink, Play } from 'lucide-react';
 
@@ -8,6 +8,7 @@ interface EmbeddedVideoPlayerProps {
   thumbnailUrl?: string | null;
   className?: string;
   autoPlay?: boolean;
+  onAspectRatioChange?: (ratio: number) => void;
 }
 
 export default function EmbeddedVideoPlayer({
@@ -15,7 +16,8 @@ export default function EmbeddedVideoPlayer({
   title = 'Repair Video',
   thumbnailUrl,
   className = 'w-full h-full',
-  autoPlay = false
+  autoPlay = false,
+  onAspectRatioChange
 }: EmbeddedVideoPlayerProps) {
   const [embedError, setEmbedError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +50,14 @@ export default function EmbeddedVideoPlayer({
   };
 
   const [aspectRatio, setAspectRatio] = useState<number>(getInitialAspectRatio());
+
+  useEffect(() => {
+    const initialRatio = getInitialAspectRatio();
+    setAspectRatio(initialRatio);
+    if (onAspectRatioChange) {
+      onAspectRatioChange(initialRatio);
+    }
+  }, [videoUrl]);
 
   if (!safeVideoUrl || !parsed || !parsed.isValid) {
     return (
@@ -95,19 +105,24 @@ export default function EmbeddedVideoPlayer({
   };
 
   // Determine container styling: aspect-ratio is key to responsive frames!
+  const isPortrait = aspectRatio < 1;
   const playerContainerStyle: React.CSSProperties = {
     aspectRatio: `${aspectRatio}`,
-    width: '100%',
+    width: isPortrait ? 'auto' : '100%',
+    height: isPortrait ? '100%' : 'auto',
     maxWidth: '100%',
     maxHeight: '75vh',
-    height: 'auto',
   };
 
   // Callback to detect direct video metadata dimensions and update aspect ratio dynamically
   const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     if (video.videoWidth && video.videoHeight) {
-      setAspectRatio(video.videoWidth / video.videoHeight);
+      const ratio = video.videoWidth / video.videoHeight;
+      setAspectRatio(ratio);
+      if (onAspectRatioChange) {
+        onAspectRatioChange(ratio);
+      }
     }
     setIsLoading(false);
   };

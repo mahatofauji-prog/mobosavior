@@ -159,33 +159,21 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
       const cleanPayload = sanitizePayload('brands', payload);
       let savedRecord: any = null;
 
-      if (isEdit) {
-        const { data: updateRes, error } = await supabase
-          .from('brands')
-          .update(cleanPayload)
-          .eq('id', id)
-          .select()
-          .single();
+      // Ensure id is always set in payload for upsert
+      cleanPayload.id = id;
 
-        if (error) {
-          console.error('[MOBO ADMIN SAVE ERROR - brands update]:', { table: 'brands', id, error });
-          throw error;
-        }
-        savedRecord = updateRes;
-      } else {
-        cleanPayload.id = id;
-        const { data: insertRes, error } = await supabase
-          .from('brands')
-          .insert(cleanPayload)
-          .select()
-          .single();
+      // Real Supabase UPSERT to handle both existing and default preset brands
+      const { data: upsertRes, error } = await supabase
+        .from('brands')
+        .upsert(cleanPayload, { onConflict: 'id' })
+        .select()
+        .single();
 
-        if (error) {
-          console.error('[MOBO ADMIN SAVE ERROR - brands insert]:', { table: 'brands', id, error });
-          throw error;
-        }
-        savedRecord = insertRes;
+      if (error) {
+        console.error('[MOBO ADMIN SAVE ERROR - brands upsert]:', { table: 'brands', id, error });
+        throw error;
       }
+      savedRecord = upsertRes;
 
       const mappedSaved: Brand = {
         id: savedRecord.id || id,
@@ -265,35 +253,27 @@ export default function AdminBrandsModels({ servicesList, onRefreshData, default
       const cleanPayload = sanitizePayload('models', payload);
       let savedRecord: any = null;
 
-      if (isEdit) {
-        const { data: updateRes, error } = await supabase
-          .from('models')
-          .update(cleanPayload)
-          .eq('id', id)
-          .select()
-          .single();
+      // Ensure id is always set in payload for upsert
+      cleanPayload.id = id;
 
-        if (error) {
-          console.error('[MOBO ADMIN SAVE ERROR - models update]:', { table: 'models', id, error });
-          throw error;
-        }
-        savedRecord = updateRes;
-      } else {
-        cleanPayload.id = id;
+      // Only set empty defaults if this is a brand new model
+      if (!isEdit) {
         cleanPayload.service_prices = {};
         cleanPayload.available_services = [];
-        const { data: insertRes, error } = await supabase
-          .from('models')
-          .insert(cleanPayload)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('[MOBO ADMIN SAVE ERROR - models insert]:', { table: 'models', id, error });
-          throw error;
-        }
-        savedRecord = insertRes;
       }
+
+      // Real Supabase UPSERT to handle both existing and default preset models
+      const { data: upsertRes, error } = await supabase
+        .from('models')
+        .upsert(cleanPayload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[MOBO ADMIN SAVE ERROR - models upsert]:', { table: 'models', id, error });
+        throw error;
+      }
+      savedRecord = upsertRes;
 
       const mappedSaved: PhoneModel = {
         id: savedRecord.id || id,

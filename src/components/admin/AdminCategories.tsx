@@ -200,43 +200,25 @@ export default function AdminCategories({ servicesList, onRefreshData }: AdminCa
       const cleanPayload = sanitizePayload('categories', payload);
       let savedRecord: any = null;
 
-      if (categoryModal.category) {
-        // Real Supabase UPDATE
-        const { data: updateRes, error: updateErr } = await supabase
-          .from('categories')
-          .update(cleanPayload)
-          .eq('id', id)
-          .select()
-          .single();
+      // Ensure id is always set in payload for upsert
+      cleanPayload.id = id;
 
-        if (updateErr) {
-          console.error('[MOBO ADMIN SAVE ERROR - categories update]:', {
-            table: 'categories',
-            id,
-            error: updateErr
-          });
-          throw updateErr;
-        }
-        savedRecord = updateRes;
-      } else {
-        // Real Supabase INSERT
-        cleanPayload.id = id;
-        const { data: insertRes, error: insertErr } = await supabase
-          .from('categories')
-          .insert(cleanPayload)
-          .select()
-          .single();
+      // Real Supabase UPSERT to safely handle both existing and default preset records
+      const { data: upsertRes, error: upsertErr } = await supabase
+        .from('categories')
+        .upsert(cleanPayload, { onConflict: 'id' })
+        .select()
+        .single();
 
-        if (insertErr) {
-          console.error('[MOBO ADMIN SAVE ERROR - categories insert]:', {
-            table: 'categories',
-            id,
-            error: insertErr
-          });
-          throw insertErr;
-        }
-        savedRecord = insertRes;
+      if (upsertErr) {
+        console.error('[MOBO ADMIN SAVE ERROR - categories upsert]:', {
+          table: 'categories',
+          id,
+          error: upsertErr
+        });
+        throw upsertErr;
       }
+      savedRecord = upsertRes;
 
       // Update local state immediately with returned data
       const mappedSaved: ServiceCategory = {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, safeUpsert } from '../../lib/supabase';
-import { sanitizePayload } from '../../lib/dbSanitizer';
+import { sanitizePayload, mapDatabaseRowToCamelCase } from '../../lib/dbSanitizer';
 import { uploadMediaFile, deleteMediaFile, compressThumbnailFile } from '../../lib/storageUpload';
 import { GalleryItem, Service, GALLERY_CATEGORIES, mapCategoryToId, getCategoryLabel } from '../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
@@ -152,7 +152,7 @@ export default function AdminGalleryManager() {
           .order('display_order', { ascending: true });
 
         if (!gErr && gData) {
-          list = gData as GalleryItem[];
+          list = gData.map(row => mapDatabaseRowToCamelCase<GalleryItem>(row));
         }
       } catch (e) {
         console.warn('Supabase gallery fetch exception, relying on local backup:', e);

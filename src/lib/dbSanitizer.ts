@@ -278,3 +278,31 @@ export function sanitizePayload<T = Record<string, any>>(tableName: string, payl
 
   return result as T;
 }
+
+/**
+ * Map a database row retrieved from Supabase (snake_case keys) back to camelCase.
+ */
+export function mapDatabaseRowToCamelCase<T = any>(row: any): T {
+  if (!row || typeof row !== 'object') {
+    return row;
+  }
+
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(row)) {
+    // Find the camelCase counterpart key
+    const camelKey = Object.keys(CAMEL_TO_SNAKE_MAP).find(
+      (k) => CAMEL_TO_SNAKE_MAP[k] === key
+    ) || key;
+    result[camelKey] = value;
+  }
+
+  // Also support fallback compatibility for active and featured properties
+  if (result.active === undefined && row.is_active !== undefined) {
+    result.active = !!row.is_active;
+  }
+  if (result.featured === undefined && row.is_featured !== undefined) {
+    result.featured = !!row.is_featured;
+  }
+
+  return result as T;
+}

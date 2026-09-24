@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { sanitizePayload } from './dbSanitizer';
+import { sanitizePayload, mapDatabaseRowToCamelCase } from './dbSanitizer';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://cynrkcrjcxpyiuagyvxj.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_63nVtmzyXYHGi1lLJWxwxw_6rY8XeKh';
@@ -84,17 +84,23 @@ export async function getDocs(q: any) {
     console.error(`[Supabase getDocs exception]:`, err);
   }
 
+  // Map each row in the list to camelCase and merge with raw data to retain snake_case compatibility
+  const mappedList = list.map(d => {
+    const mapped = mapDatabaseRowToCamelCase(d);
+    return { ...d, ...mapped };
+  });
+
   return {
-    empty: list.length === 0,
-    size: list.length,
-    docs: list.map((d: any) => ({
+    empty: mappedList.length === 0,
+    size: mappedList.length,
+    docs: mappedList.map((d: any) => ({
       id: d.id,
       data: () => d,
       exists: () => true,
       ref: { id: d.id, path: `${q.path}/${d.id}` },
       ...d
     })),
-    forEach: (cb: any) => list.forEach((d: any) => cb({
+    forEach: (cb: any) => mappedList.forEach((d: any) => cb({
       id: d.id,
       data: () => d,
       exists: () => true,
@@ -125,7 +131,11 @@ export async function getDoc(docRef: any) {
       return { exists: () => false, data: () => undefined, id };
     }
     
-    return { exists: () => true, data: () => data, id, ref: docRef };
+    // Map to camelCase and merge with raw data
+    const mapped = mapDatabaseRowToCamelCase(data);
+    const merged = { ...data, ...mapped };
+    
+    return { exists: () => true, data: () => merged, id, ref: docRef, ...merged };
   } catch {
     return { exists: () => false, data: () => undefined, id: docRef?.id };
   }

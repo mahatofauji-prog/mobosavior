@@ -38,6 +38,9 @@ import EmbeddedVideoPlayer from '../components/EmbeddedVideoPlayer';
 import { parseVideoUrl, getVideoPlatformLabel } from '../lib/videoUtils';
 
 
+import { mapDatabaseRowToCamelCase } from '../lib/dbSanitizer';
+
+
 interface AdminDashboardProps {
   onLogout: () => void;
   servicesList: Service[];
@@ -332,13 +335,13 @@ export default function AdminDashboard({
         .from('gallery')
         .select('*')
         .order('display_order', { ascending: true });
-      if (gData) setGallery(gData as GalleryItem[]);
+      if (gData) setGallery(gData.map(row => mapDatabaseRowToCamelCase<GalleryItem>(row)));
 
       const { data: vData } = await supabase
         .from('videos')
         .select('*')
         .order('display_order', { ascending: true });
-      if (vData) setVideos(vData as VideoItem[]);
+      if (vData) setVideos(vData.map(row => mapDatabaseRowToCamelCase<VideoItem>(row)));
     } catch (err) {
       console.error('Error fetching media:', err);
     } finally {

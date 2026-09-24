@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, Search, Loader2, Edit3, CheckCircle2, Clock, 
-  AlertTriangle, Hammer, Smartphone, Truck, ExternalLink, Download, X 
+  AlertTriangle, Hammer, Smartphone, Truck, ExternalLink, Download, X, Trash2 
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ServiceBooking } from '../../types';
@@ -16,6 +16,47 @@ export default function AdminServiceBookings() {
   const [selectedBooking, setSelectedBooking] = useState<ServiceBooking | null>(null);
   const [updating, setUpdating] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  
+  const [bookingToDelete, setBookingToDelete] = useState<ServiceBooking | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const deleteBooking = async (booking: ServiceBooking) => {
+    try {
+      // 1. Delete from service_bookings
+      const { error: errPrivate } = await supabase
+        .from('service_bookings')
+        .delete()
+        .eq('id', booking.id);
+      
+      if (errPrivate) throw errPrivate;
+
+      // 2. Delete from service_bookings_public (non-blocking)
+      try {
+        await supabase
+          .from('service_bookings_public')
+          .delete()
+          .eq('service_id', booking.service_id);
+      } catch (e) {
+        console.warn('Could not delete from service_bookings_public:', e);
+      }
+
+      // 3. Delete from bookings (non-blocking)
+      try {
+        await supabase
+          .from('bookings')
+          .delete()
+          .eq('id', booking.service_id);
+      } catch (e) {
+        console.warn('Could not delete from bookings:', e);
+      }
+
+      setToast({ message: 'Booking Deleted Successfully', type: 'success' });
+      await fetchBookings();
+    } catch (err: any) {
+      console.error('[deleteBooking error]:', err);
+      setToast({ message: 'Failed to delete booking: ' + (err?.message || 'Database error'), type: 'error' });
+    }
+  };
 
   const fetchBookings = async () => {
     try {
@@ -236,12 +277,24 @@ export default function AdminServiceBookings() {
                       {new Date(booking.created_at).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right">
-                      <button
-                        onClick={() => setSelectedBooking(booking)}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors inline-flex items-center gap-1"
-                      >
-                        <ExternalLink className="w-3 h-3" /> View
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setSelectedBooking(booking)}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors inline-flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" /> View
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBookingToDelete(booking);
+                          }}
+                          className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg border border-transparent hover:border-rose-100 transition-colors inline-flex items-center"
+                          title="Delete Booking"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -371,6 +424,23 @@ export default function AdminServiceBookings() {
                       {updating && <p className="text-xs text-[#0284C7] animate-pulse">Updating status...</p>}
                     </div>
 
+                    {/* Delete Action (Danger Zone) */}
+                    <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-5 space-y-3 text-left">
+                      <h4 className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">
+                        Danger Zone
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                        Deleting this booking will remove all of its records from the customer database permanently. This action cannot be undone.
+                      </p>
+                      <button
+                        onClick={() => setBookingToDelete(selectedBooking)}
+                        className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        DELETE SERVICE BOOKING
+                      </button>
+                    </div>
+
                     {/* Device Photos */}
                     <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-4">
                       <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/60 pb-2">
@@ -423,6 +493,63 @@ export default function AdminServiceBookings() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {bookingToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border border-slate-100 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 text-center"
+            >
+              <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              
+              <div className="space-y-1.5 text-center">
+                <h4 className="text-base font-black text-slate-900 font-sans tracking-tight">Confirm Deletion</h4>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  Are you sure you want to delete the booking for <strong className="text-slate-800">{bookingToDelete.customer_name}</strong> ({bookingToDelete.service_id || 'ID N/A'})? This action is permanent and cannot be undone.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  onClick={() => setBookingToDelete(null)}
+                  disabled={deleteLoading}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setDeleteLoading(true);
+                    await deleteBooking(bookingToDelete);
+                    setDeleteLoading(false);
+                    setBookingToDelete(null);
+                    setSelectedBooking(null); // Close details modal if open
+                  }}
+                  disabled={deleteLoading}
+                  className="py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1 shadow-md shadow-rose-600/10 transition-colors"
+                >
+                  {deleteLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    'Yes, Delete'
+                  )}
+                </button>
               </div>
             </motion.div>
           </motion.div>

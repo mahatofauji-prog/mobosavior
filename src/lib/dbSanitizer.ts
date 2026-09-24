@@ -32,9 +32,9 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
     'created_at', 'updated_at'
   ],
   categories: [
-    'id', 'name', 'slug', 'description', 'long_description', 'image_url',
-    'badge', 'display_order', 'is_active', 'active', 'problems_covered',
-    'service_slugs', 'created_at', 'updated_at'
+    'id', 'name', 'slug', 'description', 'longDescription', 'imageUrl', 'image_url',
+    'icon', 'badge', 'problemsCovered', 'serviceSlugs', 'seoTitle', 'h1Name',
+    'metaDescription', 'imageAltText', 'displayOrder', 'display_order'
   ],
   brands: [
     'id', 'name', 'slug', 'logo_url', 'display_order', 'is_active', 'active',
@@ -252,27 +252,39 @@ export function sanitizePayload<T = Record<string, any>>(tableName: string, payl
   const validCols = TABLE_COLUMNS[tableName];
   const result: Record<string, any> = {};
 
-  // First pass: convert camelCase keys to snake_case
-  const converted: Record<string, any> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (value === undefined) continue; // skip undefined values
-
-    const snakeKey = CAMEL_TO_SNAKE_MAP[key] || key;
-    converted[snakeKey] = value;
-  }
-
-  // Second pass: if known table columns exist, keep ONLY valid column names
   if (validCols && validCols.length > 0) {
     const validSet = new Set(validCols);
-    for (const [key, value] of Object.entries(converted)) {
+    for (const [key, value] of Object.entries(payload)) {
+      if (value === undefined) continue;
+
+      // 1. Direct match with a column name in the database
       if (validSet.has(key)) {
         result[key] = value;
+        continue;
+      }
+
+      // 2. Check if the snake_case counterpart exists in the database
+      const snakeKey = CAMEL_TO_SNAKE_MAP[key];
+      if (snakeKey && validSet.has(snakeKey)) {
+        result[snakeKey] = value;
+        continue;
+      }
+
+      // 3. Check if the camelCase counterpart exists in the database (for snake_case payload properties)
+      const camelKey = Object.keys(CAMEL_TO_SNAKE_MAP).find(
+        (k) => CAMEL_TO_SNAKE_MAP[k] === key
+      );
+      if (camelKey && validSet.has(camelKey)) {
+        result[camelKey] = value;
+        continue;
       }
     }
   } else {
-    // If table columns not explicitly listed, keep all converted keys that are snake_case or valid
-    for (const [key, value] of Object.entries(converted)) {
-      result[key] = value;
+    // If table columns are not explicitly listed, keep all converted keys using CAMEL_TO_SNAKE_MAP mapping
+    for (const [key, value] of Object.entries(payload)) {
+      if (value === undefined) continue;
+      const snakeKey = CAMEL_TO_SNAKE_MAP[key] || key;
+      result[snakeKey] = value;
     }
   }
 

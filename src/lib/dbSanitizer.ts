@@ -23,13 +23,13 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
     'youtube_url', 'updated_at'
   ],
   services: [
-    'id', 'name', 'slug', 'description', 'overview', 'image_url', 'category',
-    'price', 'price_type', 'estimated_time', 'problems_covered', 'symptoms',
-    'diagnosis_process', 'repair_process_steps', 'tools_and_tech', 'supported_brands',
-    'supported_models', 'model_prices', 'quality_options', 'warranty', 'important_notes',
-    'faqs', 'seo_title', 'meta_description', 'seo_keywords', 'canonical_url',
-    'og_image_url', 'active', 'is_active', 'featured', 'is_featured', 'display_order',
-    'created_at', 'updated_at'
+    'id', 'name', 'slug', 'description', 'overview', 'imageUrl', 'image_url', 'category',
+    'price', 'priceType', 'price_type', 'estimatedTime', 'estimated_time', 'problemsCovered', 'problems_covered',
+    'symptoms', 'diagnosisProcess', 'repairProcessSteps', 'toolsAndTech', 'supportedBrands',
+    'supportedModels', 'modelPrices', 'qualityOptions', 'warranty', 'importantNotes',
+    'faqs', 'seoTitle', 'metaDescription', 'seoKeywords', 'canonicalUrl',
+    'ogImageUrl', 'active', 'is_active', 'featured', 'displayOrder', 'display_order',
+    'createdAt', 'created_at', 'updatedAt', 'updated_at'
   ],
   categories: [
     'id', 'name', 'slug', 'description', 'longDescription', 'imageUrl', 'image_url',
@@ -37,37 +37,37 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
     'metaDescription', 'imageAltText', 'displayOrder', 'display_order'
   ],
   brands: [
-    'id', 'name', 'slug', 'logo_url', 'display_order', 'is_active', 'active',
+    'id', 'name', 'slug', 'logoUrl', 'logo_url', 'popular', 'active', 'is_active', 'displayOrder', 'display_order',
     'created_at', 'updated_at'
   ],
   models: [
-    'id', 'name', 'slug', 'brand', 'release_year', 'image_url', 'display_order',
-    'is_active', 'active', 'service_prices', 'available_services', 'created_at', 'updated_at'
+    'id', 'name', 'slug', 'brand', 'brandId', 'brand_id', 'releaseYear', 'imageUrl', 'image_url',
+    'category', 'availableServices', 'servicePrices', 'displayTypes', 'active', 'is_active',
+    'displayOrder', 'display_order', 'created_at', 'updated_at'
   ],
   prices: [
     'id', 'service_id', 'serviceId', 'service_slug', 'serviceSlug', 'service_name', 'serviceName',
     'category', 'brand_id', 'brandId', 'brand', 'model_id', 'modelId', 'model',
-    'displayVariant', 'display_variant', 'priceType', 'price_type', 'amount', 'price',
+    'displayVariant', 'priceType', 'amount', 'price',
     'currency', 'notes', 'warranty', 'turnaround_time', 'is_active', 'active', 'isActive',
     'display_order', 'displayOrder', 'created_at', 'createdAt', 'updated_at', 'updatedAt'
   ],
   gallery: [
-    'id', 'title', 'description', 'category', 'media_type', 'image_url', 'video_url',
-    'video_platform', 'youtube_video_id', 'before_image_url', 'after_image_url',
-    'thumbnail_url', 'alt_text', 'featured', 'is_featured', 'active', 'is_active',
-    'display_order', 'created_at', 'updated_at'
+    'id', 'imageUrl', 'image_url', 'videoUrl', 'video_url', 'videoPlatform', 'youtubeVideoId',
+    'beforeImageUrl', 'afterImageUrl', 'thumbnailUrl', 'title', 'description', 'category',
+    'mediaType', 'altText', 'featured', 'active', 'is_active', 'displayOrder', 'display_order',
+    'createdAt', 'created_at', 'serviceSlug', 'service_slug', 'brand', 'model', 'updated_at'
   ],
   reviews: [
-    'id', 'customer_name', 'reviewer_name', 'rating', 'review_text', 'customer_photo_url',
-    'source', 'status', 'is_active', 'active', 'is_verified', 'booking_id', 'service_availed',
-    'phone', 'device_model', 'comment', 'google_review_id', 'google_review_url',
-    'featured', 'display_order', 'created_at', 'updated_at'
+    'id', 'customerName', 'customer_name', 'reviewerName', 'reviewer_name', 'rating', 'reviewText', 'review_text',
+    'customerPhotoUrl', 'customer_photo_url', 'source', 'featured', 'active', 'is_active',
+    'displayOrder', 'display_order', 'createdAt', 'created_at', 'updatedAt', 'updated_at',
+    'serviceSlug', 'service_slug', 'service_availed', 'device_model', 'comment'
   ],
   offers: [
-    'id', 'category_id', 'category', 'title', 'description', 'image_url', 'destination_url',
-    'discount', 'start_date', 'end_date', 'valid_until', 'terms', 'cta_text', 'cta_type',
-    'cta_value', 'is_featured', 'featured', 'is_active', 'active', 'display_order',
-    'created_at', 'updated_at'
+    'id', 'categoryId', 'category_id', 'category', 'title', 'description', 'imageUrl', 'image_url',
+    'discount', 'discount_amount', 'startDate', 'endDate', 'valid_until', 'terms', 'ctaText', 'ctaType',
+    'ctaValue', 'isFeatured', 'isActive', 'is_active', 'displayOrder', 'display_order', 'created_at', 'updated_at'
   ],
   offer_categories: [
     'id', 'name', 'slug', 'description', 'display_order', 'is_active', 'active', 'created_at'
@@ -129,9 +129,9 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
     'search_console_verification', 'google_analytics_id', 'updated_at'
   ],
   videos: [
-    'id', 'title', 'description', 'category', 'video_url', 'image_url', 'thumbnail_url',
-    'video_platform', 'youtube_video_id', 'featured', 'is_featured', 'active', 'is_active',
-    'display_order', 'created_at', 'updated_at'
+    'id', 'title', 'description', 'category', 'videoUrl', 'video_url', 'image_url', 'thumbnailUrl', 'thumbnail_url',
+    'videoPlatform', 'youtubeVideoId', 'featured', 'active', 'is_active',
+    'displayOrder', 'display_order', 'createdAt', 'created_at', 'serviceSlug', 'brand', 'model', 'updated_at'
   ]
 };
 

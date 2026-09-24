@@ -813,7 +813,7 @@ export default function Home({ onNavigate, services, reviews, content, contact, 
             <div className="space-y-2">
               <span className="text-[10px] font-bold tracking-widest text-[#0284C7] uppercase">EXPERT MOBILE REPAIR</span>
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 font-sans">
-                Our Repair Services
+                VIP & PREMIUM SERVICES
               </h2>
               <p className="text-sm text-slate-500 max-w-xl font-medium">
                 From display replacement to advanced motherboard and chip-level repair, our specialists handle all major mobile repair requirements with precision.

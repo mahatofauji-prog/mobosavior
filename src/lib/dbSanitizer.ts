@@ -139,6 +139,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
 const CAMEL_TO_SNAKE_MAP: Record<string, string> = {
   branchCode: 'branch_code',
   googleMapsUrl: 'google_maps_url',
+  businessHours: 'business_hours',
   isHeadquarters: 'is_headquarters',
   displayOrder: 'display_order',
   createdAt: 'created_at',

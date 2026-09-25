@@ -404,8 +404,26 @@ export default function App() {
           branchesRes.value.forEach(docSnap => {
             const raw: any = { id: docSnap.id, ...docSnap.data() };
             const meta = raw.businessHours?._meta || raw.business_hours?._meta || {};
+            
+            const rawHours = raw.businessHours || raw.business_hours || {};
+            const normalizedHours: any = { ...rawHours };
+            const daysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            for (const d of daysList) {
+              if (normalizedHours[d]) {
+                const dayData = { ...normalizedHours[d] };
+                if (dayData.open && !dayData.openTime) dayData.openTime = dayData.open;
+                if (dayData.close && !dayData.closeTime) dayData.closeTime = dayData.close;
+                if (dayData.openTime && !dayData.open) dayData.open = dayData.openTime;
+                if (dayData.closeTime && !dayData.close) dayData.close = dayData.closeTime;
+                normalizedHours[d] = dayData;
+              } else {
+                normalizedHours[d] = { isOpen: true, openTime: '09:30', closeTime: '20:30', open: '09:30', close: '20:30' };
+              }
+            }
+
             fetchedBranches.push({
               ...raw,
+              businessHours: normalizedHours,
               isMain: raw.isMain !== undefined ? raw.isMain : !!(raw.isHeadquarters || raw.is_headquarters || meta.isMain),
               isActive: raw.isActive !== undefined ? raw.isActive : (meta.isActive !== undefined ? meta.isActive : true),
               isFeatured: raw.isFeatured !== undefined ? raw.isFeatured : (meta.isFeatured !== undefined ? meta.isFeatured : true),

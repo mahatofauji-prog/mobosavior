@@ -128,7 +128,24 @@ export default function AdminBranches({ onRefreshData }: AdminBranchesProps) {
             whatsapp: b.whatsapp || '',
             email: b.email || '',
             weeklyHoliday: meta.weeklyHoliday || 'None (Open All 7 Days)',
-            businessHours: b.businessHours || b.business_hours || DEFAULT_HOURS,
+            businessHours: (() => {
+              const rawHours = b.businessHours || b.business_hours || {};
+              const normalizedHours: any = { ...rawHours };
+              const daysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+              for (const d of daysList) {
+                if (normalizedHours[d]) {
+                  const dayData = { ...normalizedHours[d] };
+                  if (dayData.open && !dayData.openTime) dayData.openTime = dayData.open;
+                  if (dayData.close && !dayData.closeTime) dayData.closeTime = dayData.close;
+                  if (dayData.openTime && !dayData.open) dayData.open = dayData.openTime;
+                  if (dayData.closeTime && !dayData.close) dayData.close = dayData.closeTime;
+                  normalizedHours[d] = dayData;
+                } else {
+                  normalizedHours[d] = { isOpen: true, openTime: '09:30', closeTime: '20:30', open: '09:30', close: '20:30' };
+                }
+              }
+              return normalizedHours;
+            })(),
             description: meta.description || '',
             imageUrl: meta.imageUrl || '/assets/images/why_choose_mobo_savior.png',
             serviceIds: meta.serviceIds || [],
@@ -285,10 +302,24 @@ export default function AdminBranches({ onRefreshData }: AdminBranchesProps) {
       seoDescription: formState.seoDescription.trim() || `${formState.name} - ${formState.address}, ${formState.city}`
     };
 
-    const businessHoursWithMeta = {
-      ...(typeof formState.businessHours === 'object' && formState.businessHours !== null 
+    const rawHoursState = typeof formState.businessHours === 'object' && formState.businessHours !== null 
         ? JSON.parse(JSON.stringify(formState.businessHours)) 
-        : JSON.parse(JSON.stringify(DEFAULT_HOURS))),
+        : JSON.parse(JSON.stringify(DEFAULT_HOURS));
+        
+    const daysList = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    for (const d of daysList) {
+      if (rawHoursState[d]) {
+        const dayData = { ...rawHoursState[d] };
+        if (dayData.openTime && !dayData.open) dayData.open = dayData.openTime;
+        if (dayData.closeTime && !dayData.close) dayData.close = dayData.closeTime;
+        if (dayData.open && !dayData.openTime) dayData.openTime = dayData.open;
+        if (dayData.close && !dayData.closeTime) dayData.closeTime = dayData.close;
+        rawHoursState[d] = dayData;
+      }
+    }
+
+    const businessHoursWithMeta = {
+      ...rawHoursState,
       _meta: metaObj
     };
 

@@ -7,9 +7,9 @@
 // Known valid columns for each Supabase table
 export const TABLE_COLUMNS: Record<string, string[]> = {
   branches: [
-    'id', 'name', 'slug', 'branch_code', 'address', 'city', 'state', 'pincode',
-    'google_maps_url', 'latitude', 'longitude', 'phone', 'whatsapp', 'email',
-    'business_hours', 'is_headquarters', 'display_order', 'created_at', 'updated_at'
+    'id', 'name', 'slug', 'branch_code', 'branchCode', 'address', 'city', 'state', 'pincode',
+    'google_maps_url', 'googleMapsUrl', 'latitude', 'longitude', 'phone', 'whatsapp', 'email',
+    'business_hours', 'businessHours', 'is_headquarters', 'isHeadquarters', 'display_order', 'displayOrder', 'created_at', 'updated_at'
   ],
   settings: [
     'id', 'data', 'value', 'updated_at'
@@ -259,6 +259,36 @@ export function sanitizePayload<T = Record<string, any>>(tableName: string, payl
     const validSet = new Set(validCols);
     for (const [key, value] of Object.entries(payload)) {
       if (value === undefined) continue;
+
+      // Special handling for branches table to keep camelCase and snake_case dual columns perfectly in sync
+      if (tableName === 'branches') {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey === 'businesshours' || lowerKey === 'business_hours') {
+          result['businessHours'] = value;
+          result['business_hours'] = value;
+          continue;
+        }
+        if (lowerKey === 'branchcode' || lowerKey === 'branch_code') {
+          result['branchCode'] = value;
+          result['branch_code'] = value;
+          continue;
+        }
+        if (lowerKey === 'googlemapsurl' || lowerKey === 'google_maps_url') {
+          result['googleMapsUrl'] = value;
+          result['google_maps_url'] = value;
+          continue;
+        }
+        if (lowerKey === 'isheadquarters' || lowerKey === 'is_headquarters') {
+          result['isHeadquarters'] = value;
+          result['is_headquarters'] = value;
+          continue;
+        }
+        if (lowerKey === 'displayorder' || lowerKey === 'display_order') {
+          result['displayOrder'] = value;
+          result['display_order'] = value;
+          continue;
+        }
+      }
 
       // 1. Direct match with a column name in the database
       if (validSet.has(key)) {

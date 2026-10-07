@@ -55,6 +55,56 @@ interface AdminDashboardProps {
   businessHours?: BusinessHours;
 }
 
+// Helper to convert base64 VAPID key to Uint8Array for PushManager
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Ensure the Service Worker is registered, active, and fully ready before any push subscription
+async function getReadyServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service Worker is not supported in this browser/device.');
+  }
+
+  // Register or re-assert the service worker registration
+  await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+
+  // Wait for the service worker registration to be ready
+  const reg = await navigator.serviceWorker.ready;
+
+  // If the active worker is still null (installing or waiting), wait for it to activate
+  if (!reg.active) {
+    const sw = reg.installing || reg.waiting;
+    if (sw) {
+      await new Promise<void>((resolve) => {
+        if (sw.state === 'activated') {
+          resolve();
+          return;
+        }
+        const onStateChange = () => {
+          if (sw.state === 'activated') {
+            sw.removeEventListener('statechange', onStateChange);
+            resolve();
+          }
+        };
+        sw.addEventListener('statechange', onStateChange);
+        setTimeout(resolve, 4000);
+      });
+    }
+  }
+
+  return reg;
+}
+
 export default function AdminDashboard({
   onLogout,
   servicesList,
@@ -116,8 +166,9 @@ export default function AdminDashboard({
     setPushSupported(isSupported);
     if (isSupported) {
       setPushPermission(Notification.permission as any);
-      navigator.serviceWorker.ready.then((reg) => {
-        reg.pushManager.getSubscription().then((sub) => {
+      getReadyServiceWorkerRegistration()
+        .then((reg) => reg.pushManager.getSubscription())
+        .then((sub) => {
           if (sub) {
             setPushEnabled(true);
             localStorage.setItem('mobo_push_enabled', 'true');
@@ -125,8 +176,10 @@ export default function AdminDashboard({
             setPushEnabled(false);
             localStorage.removeItem('mobo_push_enabled');
           }
+        })
+        .catch((err) => {
+          console.warn('[Push Init] SW init error:', err);
         });
-      });
     }
   }, []);
 
@@ -189,14 +242,20 @@ export default function AdminDashboard({
           sessionStorage.setItem('admin_passcode', passcode);
         }
 
-        // Register service worker and subscribe
-        const reg = await navigator.serviceWorker.register('/sw.js');
-        console.log('[Push Client] Service Worker registered:', reg);
+        // Register and guarantee service worker is fully active and ready before subscribing
+        const reg = await getReadyServiceWorkerRegistration();
+        console.log('[Push Client] Service Worker active and ready:', reg);
 
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: 'BJZ8rfRrKDAy2tCKAmb_lqGUVfXLOa3wEp90OQz20RnwxrSRjoss2WmaqTt-UIgUUW3OFJeOiT1o1kiBXJctjjc',
-        });
+        // Convert base64 VAPID key to Uint8Array for bulletproof mobile/Android compatibility
+        const appServerKey = urlBase64ToUint8Array('BJZ8rfRrKDAy2tCKAmb_lqGUVfXLOa3wEp90OQz20RnwxrSRjoss2WmaqTt-UIgUUW3OFJeOiT1o1kiBXJctjjc');
+
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: appServerKey as any,
+          });
+        }
 
         // Register subscription in Edge Function
         const response = await fetch('https://cynrkcrjcxpyiuagyvxj.supabase.co/functions/v1/send-new-booking-notification', {
@@ -237,7 +296,7 @@ export default function AdminDashboard({
     if (pushEnabled) {
       setIsRegisteringPush(true);
       try {
-        const reg = await navigator.serviceWorker.ready;
+        const reg = await getReadyServiceWorkerRegistration();
         const sub = await reg.pushManager.getSubscription();
         if (sub) {
           await fetch('https://cynrkcrjcxpyiuagyvxj.supabase.co/functions/v1/send-new-booking-notification', {
@@ -270,7 +329,7 @@ export default function AdminDashboard({
     setIsTestingPush(true);
     setPushError('');
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await getReadyServiceWorkerRegistration();
       const sub = await reg.pushManager.getSubscription();
       if (!sub) {
         throw new Error('No active subscription found. Please re-enable notifications.');
